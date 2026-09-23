@@ -18,6 +18,15 @@ Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`E
 - LINE 顯示名稱可變更，不得當成權限依據。普通主揪權限使用 LINE `userId`；管理員模式由 GAS 驗證密碼。
 - 診斷線上 GAS 時，只輸出 `status`、`schemaVersion`、功能旗標或錯誤訊息，不得顯示整包活動與成員資料。
 
+## 發送到聊天室與 @ 提及
+
+「宣傳」與「分享活動」走 `sendTextToChat()`：能發就用 `liff.sendMessages()` 直接發到聊天室，不能發才退回 `safeCopyText()`。
+
+- 需要 LIFF 應用程式勾選 `chat_message.write` scope。加這個 scope 之後，已授權過的使用者下次開啟會再跳一次同意畫面。
+- `canSendToChat()` 三個條件缺一不可：`isLiffReady`、`liff.isInClient()`、`liff.getContext().type` 是 `utou`／`group`／`room`。外部瀏覽器一律不行。
+- 訊息發到「**開啟這個 LIFF 的那個聊天室**」，不是某個固定群組。從書籤或 Keep 開啟就會落到別處或失敗，所以**複製的退路不可以拿掉**。
+- **`@名字` 用程式送出只是純文字，不會變成真正的提及，也不會發通知。** 真正的提及要 `text message (v2)`，而 `liff.sendMessages()` 的支援清單裡沒有它。所以「@ 標記」「@標記成員」這類按鈕**必須維持複製貼上**，不要「順手升級」成直接發送。
+
 ## 站台設定與 fork 防呆
 
 換人使用要改的東西全部集中在 `index.html` **最上方**的 `window.SITE_SETUP`（`GAS_API_URL`、`LIFF_ID`、`LIFF_URL`、`OWNER_HOSTS`）。`CONFIG` 只是讀它，不要把這些值改回寫死在 `CONFIG` 裡——那會讓接手的人要在五千行裡找。

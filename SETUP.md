@@ -85,6 +85,7 @@ https://你的帳號.github.io/你的倉庫名/
    - Size：**Full**
    - Endpoint URL：**填第 2 步的 GitHub Pages 網址**
    - Scopes：勾選 **profile**（必要，用來取得使用者名稱與頭像）
+     與 **chat_message.write**（讓「宣傳」「分享活動」能直接發到聊天室；不勾也能用，只是會退回「複製後自己貼上」）
    - 按 Add
 5. 建立後會得到兩個東西：
    - **LIFF ID**：長得像 `2010984505-Nv6CpgYO`

@@ -1778,7 +1778,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-09-08T16:01:53+08:00">v260908.1601</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-09-23T17:25:34+08:00">v260923.1725</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2269,7 +2269,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v260908.1601", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v260923.1725", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -2342,6 +2342,43 @@
     const locationResolveCache = new Map();
 
     // --- CROSS-PLATFORM UTILS ---
+    /**
+     * 優先直接發到 LINE 聊天室，不行才退回複製。
+     *
+     * liff.sendMessages() 只在「LINE 內、且這個 LIFF 是從聊天室被打開」時可用，
+     * 外部瀏覽器一律不行；而且訊息是發到**開啟這個 LIFF 的那個聊天室**，
+     * 不是某個固定群組——從書籤或 Keep 開啟就會落到別的地方或失敗。
+     * 所以複製的退路一定要留著，不能拿掉。
+     *
+     * 注意：這裡只能送純文字訊息，`@名字` 不會變成真正的提及，也不會發通知。
+     * 真的要 tag 人只能讓使用者自己貼上，見「@ 標記」相關按鈕。
+     */
+    function canSendToChat() {
+      try {
+        if (!isLiffReady || !liff.isInClient()) return false;
+        const context = liff.getContext();
+        return Boolean(context) && ["utou", "group", "room"].includes(context.type);
+      } catch (error) {
+        return false;
+      }
+    }
+
+    async function sendTextToChat(text, sentMessage, copiedMessage) {
+      if (canSendToChat()) {
+        try {
+          await liff.sendMessages([{ type: "text", text: text }]);
+          showToast(sentMessage);
+          return true;
+        } catch (error) {
+          // 多半是使用者還沒同意 chat_message.write，退回複製即可。
+          console.warn("sendMessages failed, falling back to copy:", error);
+        }
+      }
+      safeCopyText(text);
+      showToast(copiedMessage);
+      return false;
+    }
+
     function safeCopyText(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         return navigator.clipboard.writeText(text).catch(() => fallbackCopyText(text));
@@ -4423,8 +4460,7 @@ ${eventBlocks}
 點此線上報名：
 ${pageUrl}`;
 
-      safeCopyText(broadcastText);
-      showToast("已複製宣傳資訊，請分享到群組！");
+      sendTextToChat(broadcastText, "已發送宣傳到聊天室", "已複製宣傳資訊，請貼到群組");
     }
 
     // --- 10. EXPORT ENDED EVENTS FUNCTION ---
@@ -5099,8 +5135,7 @@ ${isFixedGroup(evt) ? "本週參與" : "已報名成員"}：${memberNames}
 點此線上報名：
 ${getShareableUrl()}`;
 
-        safeCopyText(shareText);
-        showToast("已複製活動內容");
+        sendTextToChat(shareText, "已發送活動內容到聊天室", "已複製活動內容，請貼到群組");
       };
 
       // 只在個人的 Google 日曆建立一筆行程，不寫入 GAS 或群組共用日曆。
