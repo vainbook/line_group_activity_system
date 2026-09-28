@@ -1778,7 +1778,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-09-23T17:25:34+08:00">v260923.1725</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-09-28T11:50:36+08:00">v260928.1150</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2269,7 +2269,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v260923.1725", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v260928.1150", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4426,6 +4426,24 @@
     }
 
     // --- 8. BROADCAST ALL OPEN EVENTS ---
+    // 單一活動的完整分享內容。「分享活動」與「加強推廣」共用，改格式只改這裡。
+    function buildEventShareText(evt) {
+      const maxCapacity = getMaxAttendees(evt);
+      const capacityText = `${evt.attendees.length}${maxCapacity > 0 ? "/" + maxCapacity : ""} 人`;
+      const memberNames = evt.attendees.map(user => `@${user.displayName}`).join(" ") || "尚無";
+      return `【${isFixedGroup(evt) ? "固定團" : "活動"}：${evt.title}】
+時間：${getEventTimeText(evt)}
+地點：${normalizeLocation(evt.location)}
+費用：${evt.fee || "免費"}
+主揪：${evt.hostName || evt.hostUser?.displayName || "未指定"}
+人數：${capacityText}
+活動說明：${evt.description || "尚無補充說明"}
+${isFixedGroup(evt) ? "本週參與" : "已報名成員"}：${memberNames}
+
+點此線上報名：
+${getShareableUrl()}`;
+    }
+
     function broadcastOpenEvents() {
       const openEvents = eventsData
         .filter(evt => {
@@ -4534,18 +4552,12 @@ ${pageUrl}`;
 
 
     // --- 12. AUTO-COPY SINGLE EVENT TRIGGER ---
-    function triggerAutoCopyAndAlert(evt, actionType) {
+    // 報名、發起、編輯、取消參加之後的通知文字。
+    function buildActionShareText(evt, actionType) {
+      if (actionType === "cancel") return `取消參加${evt.title}活動`;
+
       const formattedTime = getEventTimeText(evt);
-
       const pageUrl = getShareableUrl();
-      
-      if (actionType === "cancel") {
-        const cancelText = `取消參加${evt.title}活動`;
-        safeCopyText(cancelText);
-        showToast("活動資訊已自動複製\n請到群組中貼上分享");
-        return;
-      }
-
       const attendeeNames = evt.attendees.map(u => u.displayName).join(", ");
       let headline = "";
       if (actionType === "join") {
@@ -4556,17 +4568,33 @@ ${pageUrl}`;
         headline = `已更新【${evt.title}】`;
       }
 
-      const textToCopy = 
-`${headline}
+      return `${headline}
 主題：${evt.title}
 時間：${formattedTime}
 報名人：${attendeeNames || '尚無'}
 
 點此線上報名：
 ${pageUrl}`;
+    }
 
-      safeCopyText(textToCopy);
+    // 報名、編輯、取消參加維持複製：這些是操作的附帶效果，不是使用者按下的分享鈕，
+    // 改成直接發送等於每次有人報名就替他在群組發言。只有開團會直接發，見 announceNewEvent。
+    function triggerAutoCopyAndAlert(evt, actionType) {
+      safeCopyText(buildActionShareText(evt, actionType));
       showToast("活動資訊已自動複製\n請到群組中貼上分享");
+    }
+
+    // 開團公告：只在雲端確認建立之後才發，否則開團失敗會在群組公告一個不存在的活動。
+    // 這裡刻意不走 sendTextToChat 的複製退路——此時已經離開使用者按鈕的當下，
+    // 瀏覽器會擋下剪貼簿寫入，那個「已複製」提示會是假的。
+    async function announceNewEvent(evt) {
+      try {
+        await liff.sendMessages([{ type: "text", text: buildActionShareText(evt, "create") }]);
+        showToast("已發起揪團，並發送到聊天室");
+      } catch (error) {
+        console.warn("announceNewEvent failed:", error);
+        showToast("活動已建立，但沒能發到聊天室\n可以到活動裡按「分享活動」");
+      }
     }
 
     // --- 13. EVENT CREATION ---
@@ -4616,9 +4644,15 @@ ${pageUrl}`;
 
       eventsData.push(newEvent);
       saveLocalEvents();
+      // 在使用者按下送出的當下就決定走哪條路：
+      // 能發到聊天室 → 等雲端確認後再發；不能發 → 立刻複製（剪貼簿要在按鈕當下寫入）。
+      const announceInChat = canSendToChat();
       sendPostToGAS({ action: "saveEvent", eventAction: "create", ...newEvent })
         .then(result => {
-          if (result.ok) return;
+          if (result.ok) {
+            if (announceInChat) announceNewEvent(newEvent);
+            return;
+          }
           // 建立失敗要把活動整筆移除，不能留下雲端沒有的幽靈活動。
           eventsData = eventsData.filter(item => item.id !== newEvent.id);
           expandedEventIds.delete(newEvent.id);
@@ -4633,7 +4667,7 @@ ${pageUrl}`;
       setCreateFixedMode(false);
       setCreateWishMode(false);
 
-      triggerAutoCopyAndAlert(newEvent, "create");
+      if (!announceInChat) triggerAutoCopyAndAlert(newEvent, "create");
     });
 
     // --- 活動留言 ---
@@ -4988,10 +5022,18 @@ ${pageUrl}`;
 
       if (!result.ok) {
         rollbackEventState(snapshot, `加強推廣設定失敗，已還原。\n\n${result.message}`);
+      } else if (nextHighlighted) {
+        // 開啟推廣時順便把活動送到聊天室。分享內容不依賴雲端確認結果，
+        // 所以 pending 也照送；只有明確失敗（上面那個分支）才不送。
+        sendTextToChat(
+          buildEventShareText(evt),
+          "已開啟加強推廣，並發送到聊天室",
+          "已開啟加強推廣，活動內容已複製，請貼到群組"
+        );
       } else if (result.pending) {
         showToast(result.persisted ? "推廣設定已保留，雲端會自動確認" : "推廣結果待確認");
       } else {
-        showToast(nextHighlighted ? "已開啟加強推廣" : "已取消加強推廣");
+        showToast("已取消加強推廣");
       }
 
       processingHighlightEventIds.delete(eventId);
@@ -5119,23 +5161,7 @@ ${pageUrl}`;
 
       // 完整活動內容分享。
       document.getElementById("btn-share-event").onclick = () => {
-        const maxCapacity = getMaxAttendees(evt);
-        const capacityText = `${evt.attendees.length}${maxCapacity > 0 ? "/" + maxCapacity : ""} 人`;
-        const memberNames = evt.attendees.map(user => `@${user.displayName}`).join(" ") || "尚無";
-        const shareText =
-`【${isFixedGroup(evt) ? "固定團" : "活動"}：${evt.title}】
-時間：${formattedTime}
-地點：${normalizeLocation(evt.location)}
-費用：${evt.fee || "免費"}
-主揪：${evt.hostName || evt.hostUser?.displayName || "未指定"}
-人數：${capacityText}
-活動說明：${evt.description || "尚無補充說明"}
-${isFixedGroup(evt) ? "本週參與" : "已報名成員"}：${memberNames}
-
-點此線上報名：
-${getShareableUrl()}`;
-
-        sendTextToChat(shareText, "已發送活動內容到聊天室", "已複製活動內容，請貼到群組");
+        sendTextToChat(buildEventShareText(evt), "已發送活動內容到聊天室", "已複製活動內容，請貼到群組");
       };
 
       // 只在個人的 Google 日曆建立一筆行程，不寫入 GAS 或群組共用日曆。

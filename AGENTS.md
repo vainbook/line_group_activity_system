@@ -20,7 +20,15 @@ Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`E
 
 ## 發送到聊天室與 @ 提及
 
-「宣傳」與「分享活動」走 `sendTextToChat()`：能發就用 `liff.sendMessages()` 直接發到聊天室，不能發才退回 `safeCopyText()`。
+「宣傳」「分享活動」與「開啟加強推廣」走 `sendTextToChat()`：能發就用 `liff.sendMessages()` 直接發到聊天室，不能發才退回 `safeCopyText()`。
+
+- 單一活動的分享內容只有一個來源：`buildEventShareText(evt)`。「分享活動」與「加強推廣」共用，改格式只改這裡，不要再各自複製一份模板。
+- 開啟加強推廣時才送，取消時不送。雲端 `pending` 也照送（分享內容不依賴確認結果），只有明確失敗回滾時不送。
+- **開團會直接發到聊天室（`announceNewEvent()`），報名、編輯、取消參加維持複製（`triggerAutoCopyAndAlert()`）。** 這是使用者決定的：新活動公告有用，報名訊息每次都替人在群組發言會刷屏。不要把報名、編輯、取消也改成自動發送。
+- 開團公告**必須等雲端確認建立之後才發**（在 `saveEvent` 的 `.then` 裡、`result.ok` 才呼叫）。開團是樂觀寫入，送出後不等結果就關視窗；如果在送出當下就發，開團失敗會在群組公告一個不存在的活動。
+- 要不要發是在**使用者按下送出的當下**用 `canSendToChat()` 決定（`announceInChat`），不能等雲端回來再判斷。不能發的情況要立刻複製：瀏覽器只允許在使用者操作的當下寫入剪貼簿，等了幾秒才複製會被擋。
+- 因為同樣的理由，`announceNewEvent()` 發送失敗時**不退回複製**，而是提示「可以到活動裡按『分享活動』」。退回複製在這個時間點會失敗，顯示「已複製」會是假的。
+- 四種操作的通知文字由 `buildActionShareText(evt, actionType)` 產生，複製與開團公告共用。
 
 - 需要 LIFF 應用程式勾選 `chat_message.write` scope。加這個 scope 之後，已授權過的使用者下次開啟會再跳一次同意畫面。
 - `canSendToChat()` 三個條件缺一不可：`isLiffReady`、`liff.isInClient()`、`liff.getContext().type` 是 `utou`／`group`／`room`。外部瀏覽器一律不行。
