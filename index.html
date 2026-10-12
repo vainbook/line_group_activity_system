@@ -1939,7 +1939,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-12T18:12:50+08:00">v261012.1812</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-12T19:40:13+08:00">v261012.1940</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2305,9 +2305,9 @@
       
       <div class="modal-form-body">
         <div style="background:#f8fafc; border-radius:12px; padding:12px; margin-bottom:14px; border:1px solid #e2e8f0;">
-          <div style="margin-bottom:8px;"><strong>時間：</strong><span id="detail-time">--</span></div>
-          <div style="margin-bottom:8px;"><strong>地點：</strong><span id="detail-location">--</span></div>
-          <div style="margin-bottom:8px;"><strong>費用：</strong><span id="detail-fee">--</span></div>
+          <div class="detail-event-only" style="margin-bottom:8px;"><strong>時間：</strong><span id="detail-time">--</span></div>
+          <div class="detail-event-only" style="margin-bottom:8px;"><strong>地點：</strong><span id="detail-location">--</span></div>
+          <div class="detail-event-only" style="margin-bottom:8px;"><strong>費用：</strong><span id="detail-fee">--</span></div>
           
           <div><strong>主揪：</strong><span id="detail-host-name">--</span></div>
         </div>
@@ -2450,7 +2450,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261012.1812", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261012.1940", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4854,6 +4854,16 @@
     // --- 8. BROADCAST ALL OPEN EVENTS ---
     // 單一活動的完整分享內容。「分享活動」與「加強推廣」共用，改格式只改這裡。
     function buildEventShareText(evt) {
+      if (isFixedGroup(evt)) {
+        const names = evt.attendees.map(user => `@${user.displayName}`).join(" ") || "尚無";
+        return `【興趣調查：${evt.title}】
+主揪：${evt.hostName || evt.hostUser?.displayName || "未指定"}
+說明：${evt.description || "尚無補充說明"}
+有興趣（${evt.attendees.length} 人）：${names}
+
+點此表示興趣：
+${getShareableUrl()}`;
+      }
       const maxCapacity = getMaxAttendees(evt);
       const capacityText = `${evt.attendees.length}${maxCapacity > 0 ? "/" + maxCapacity : ""} 人`;
       const memberNames = evt.attendees.map(user => `@${user.displayName}`).join(" ") || "尚無";
@@ -4871,6 +4881,10 @@ ${getShareableUrl()}`;
     }
 
     function broadcastOpenEvents() {
+      const interestTags = eventsData
+        .filter(evt => isFixedGroup(evt) && !isEventDeleted(evt))
+        .sort((a, b) => b.attendees.length - a.attendees.length);
+
       const openEvents = eventsData
         .filter(evt => {
           if (isFixedGroup(evt)) return false;
@@ -4885,8 +4899,10 @@ ${getShareableUrl()}`;
         });
 
       if (openEvents.length === 0) {
-        alert("目前沒有開放報名中的活動可宣傳！");
-        return;
+        if (interestTags.length === 0) {
+          alert("目前沒有開放報名中的活動可宣傳！");
+          return;
+        }
       }
 
       const pageUrl = getShareableUrl();
@@ -4898,9 +4914,13 @@ ${getShareableUrl()}`;
         return `${getEventTimeText(evt)} ${evt.title} (${capacityStr})`;
       }).join("\n");
 
-      const broadcastText =
-`【群組活動】
-${eventBlocks}
+      // 興趣調查接在活動後面，只列標籤與人數。
+      const sections = [];
+      if (openEvents.length > 0) sections.push(`【群組活動】\n${eventBlocks}`);
+      if (interestTags.length > 0) {
+        sections.push(`【興趣調查】\n${interestTags.map(evt => `${evt.title}（${evt.attendees.length} 人）`).join("\n")}`);
+      }
+      const broadcastText = `${sections.join("\n\n")}
 
 點此線上報名：
 ${pageUrl}`;
@@ -5487,6 +5507,10 @@ ${pageUrl}`;
       const canDelete = canCurrentUserDeleteEvent(evt);
 
       document.getElementById("detail-title").innerText = evt.title;
+      // 興趣調查只留主揪與說明，時間、地點、費用對一個興趣標籤沒有意義。
+      document.querySelectorAll("#modal-detail .detail-event-only").forEach(row => {
+        row.style.display = isFixedGroup(evt) ? "none" : "";
+      });
       document.getElementById("detail-time").innerText = formattedTime;
       renderSafeLocation(document.getElementById("detail-location"), evt.location);
       document.getElementById("detail-fee").innerText = evt.fee || "免費";
@@ -5637,6 +5661,8 @@ ${pageUrl}`;
         ? "請先更新 GAS 並執行 setupProject()"
         : (!canEdit ? "報名後即可設定加強推廣" : "全站同時最多三個活動");
       highlightBtn.onclick = () => toggleEventHighlight(evt.id);
+      // 加強推廣是給有日期的活動用的，興趣調查不提供。
+      highlightBtn.style.display = isFixedGroup(evt) ? "none" : "";
 
       const deleteBtn = document.getElementById("btn-delete-event");
       if (canDelete) {

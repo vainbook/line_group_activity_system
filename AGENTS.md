@@ -122,8 +122,9 @@ Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`E
 「固定團」的概念已拿掉，改為**興趣調查**：排序列下方、活動列表上方一排可左右滑的粉色泡泡，每顆是一個標籤（例如喝酒、運動）加上有興趣的人數。
 
 - **資料沿用固定團**，不另開資料表：`isFixedGroup = TRUE` 的列就是一個標籤，`title` 是標籤名，`attendees` 是有興趣的人。建立、表態、刪除、移除成員全部走既有的 `saveEvent`／`toggleRSVP`／`deleteEvent`／`adminRemoveAttendee`。欄位名稱保留 `isFixedGroup` 是為了相容既有資料與後端，不要為了改名去動 schema。
-- 興趣調查**不出現在活動列表**，也不是篩選分類；「宣傳」不列興趣調查；建立活動表單裡的固定團開關已隱藏（`updateFixedGroupAvailability` 設為 `display:none`）。
+- 興趣調查**不出現在活動列表**，也不是篩選分類；「宣傳」在活動之後附一段【興趣調查】，只列「標籤（N 人）」，人數多的在前；建立活動表單裡的固定團開關已隱藏（`updateFixedGroupAvailability` 設為 `display:none`）。
 - 新增：泡泡列右側的「＋」，開置中小視窗 `#modal-interest-new`（`maxlength=6` 加字數計數），**限 6 個字**。**不要改回原生 `prompt`**：手機上會露出「網址 顯示」的標頭、樣式不搭，部分 LINE 瀏覽器還會直接擋掉，完全同名時導去現有那顆。用編輯改名不擋字數，泡泡用 CSS 省略號處理過長名稱。新增標籤不通知群組。
+- 詳情視窗對興趣調查做精簡：隱藏時間、地點、費用（`.detail-event-only`）與加強推廣，只留主揪、說明、有興趣的人與紀錄。「分享活動」也用精簡版文字（`buildEventShareText` 的興趣調查分支）。
 - 表態：點泡泡開詳情視窗，footer 的「我有興趣／取消興趣」。自己有興趣的泡泡是實心粉色。表態不複製、不發送通知，只跳 toast。
 - **發起人可以自己取消興趣**（前端 `toggleRSVP` 與後端 `updateRsvp_` 都對 `isFixedGroup` 放行）。一般活動的主揪仍必須先交棒——這條例外只限興趣調查。
 - 管理員一鍵重置：管理員模式下泡泡列多一顆「重置人數」，走 `adminResetInterests`（`assertAdminPermission_`），清空所有興趣標籤的 `attendees`，**標籤本身保留**，每個標籤的紀錄寫一筆「管理員重置興趣名單」，AuditLog 寫一筆。刪除標籤與移除單人沿用詳情視窗原本的按鈕。
