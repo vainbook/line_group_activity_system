@@ -99,7 +99,7 @@ Google Maps 分享網址會由 GAS 限定在 Google Maps 網域內解析，取�
 | `timestamp` | 伺服器紀錄時間 |
 | `actorUserId` | 操作者 LINE userId |
 | `actorName` | 操作者名稱 |
-| `actionType` | `create`、`join`、`leave`、`update`、`handoff`、`delete`、`comment`、`highlight`、`unhighlight`、`admin_remove_attendee`、`checkin`、`admin_check`、`admin_uncheck`、`admin_remove_member`、`admin_reset_checkins` |
+| `actionType` | `create`、`join`、`leave`、`update`、`handoff`、`delete`、`comment`、`highlight`、`unhighlight`、`admin_remove_attendee`、`admin_reset_interests`、`checkin`、`admin_check`、`admin_uncheck`、`admin_remove_member`、`admin_reset_checkins` |
 | `action` | 可閱讀的操作說明 |
 | `details` | 補充 JSON 資料 |
 

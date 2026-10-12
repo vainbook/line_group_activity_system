@@ -795,6 +795,95 @@
       color: var(--line-text-sub);
     }
 
+    /* 興趣調查泡泡列。可左右滑，不換行；名稱太長就省略，維持泡泡大小一致。 */
+    .interest-bar {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 2px 2px 10px;
+      margin-bottom: 4px;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .interest-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .interest-bar:empty {
+      display: none;
+    }
+
+    .interest-chip {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      max-width: 150px;
+      padding: 4px 6px 4px 14px;
+      border: 2px solid #fbcfe8;
+      border-radius: 999px;
+      background: #fff5fa;
+      color: #9d174d;
+      font-family: var(--font-line);
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(190, 24, 93, 0.12);
+      transition: transform 0.15s;
+    }
+
+    .interest-chip:active {
+      transform: scale(0.95);
+    }
+
+    .interest-chip-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .interest-chip-count {
+      flex-shrink: 0;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: #fbcfe8;
+      color: #831843;
+      font-size: 12.5px;
+      line-height: 24px;
+      text-align: center;
+    }
+
+    /* 自己有興趣的那顆變實心 */
+    .interest-chip.is-mine {
+      background: #ec4899;
+      border-color: #ec4899;
+      color: #ffffff;
+    }
+
+    .interest-chip.is-mine .interest-chip-count {
+      background: #ffffff;
+      color: #be185d;
+    }
+
+    .interest-chip-add {
+      padding: 4px 14px;
+      border-style: dashed;
+      background: rgba(255, 255, 255, 0.75);
+      box-shadow: none;
+    }
+
+    .interest-chip-reset {
+      padding: 4px 14px;
+      border-color: #fca5a5;
+      background: #fee2e2;
+      color: #dc2626;
+      box-shadow: none;
+    }
+
     .fab-group {
       position: fixed;
       bottom: max(20px, env(safe-area-inset-bottom));
@@ -1778,7 +1867,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-09-28T11:50:36+08:00">v260928.1150</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-12T17:50:21+08:00">v261012.1750</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -1822,7 +1911,6 @@
         <span class="sort-panel-label">顯示分類</span>
         <div class="sort-panel-pills">
           <button type="button" class="tab-btn active" data-filter="open" aria-pressed="true">揪團中</button>
-          <button type="button" class="tab-btn active" data-filter="fixed" aria-pressed="true">固定團</button>
           <button type="button" class="tab-btn active" data-filter="wish" aria-pressed="true">許願團</button>
         </div>
       </div>
@@ -1831,6 +1919,9 @@
     </div>
 
     <!-- Event Cards Container -->
+    <!-- 興趣調查：每顆泡泡是一個標籤與有興趣的人數，點開看名單 -->
+    <div id="interest-bar" class="interest-bar" aria-label="興趣調查"></div>
+
     <main id="event-list">
       <!-- Dynamic Rendered Event Cards -->
     </main>
@@ -1901,7 +1992,7 @@
       </div>
       <div class="modal-form-body">
         <p id="calendar-hint" class="calendar-hint">
-          這裡顯示所有未過期的一般活動。固定團沒有固定日期，不會出現在日曆上。
+          這裡顯示所有未過期的一般活動。興趣調查沒有日期，不會出現在日曆上。
         </p>
         <div id="calendar-embed-wrap" class="calendar-embed-wrap">
           <iframe id="calendar-embed" title="活動日曆" loading="lazy"></iframe>
@@ -2175,6 +2266,7 @@
       </div>
 
       <div class="modal-footer" style="display:flex; gap:10px;">
+        <button id="btn-toggle-interest" class="line-btn btn-join" type="button" style="flex:1; display:none;">我有興趣</button>
         <button id="btn-delete-event" class="line-btn btn-delete" style="flex:1; display:none;">
           刪除活動
         </button>
@@ -2269,7 +2361,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v260928.1150", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261012.1750", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -2322,7 +2414,8 @@
     let checkinRequestInFlight = false;
 
     // 三個分類各自可獨立開關，預設全開。搬進排序面板後仍然是獨立開關，不是分頁。
-    const activeFilters = new Set(["open", "fixed", "wish"]);
+    // 固定團已改為上方的興趣調查泡泡，不再出現在列表，也不再是篩選分類。
+    const activeFilters = new Set(["open", "wish"]);
     // 活動時間排序方向。near-first = 快要發生的排前面（預設，也是舊行為）。
     let eventSortOrder = "near-first";
     let activeEventId = null;
@@ -2994,7 +3087,8 @@
       const isSupported = isDevMode || Number(serverSchemaVersion) >= 2;
       const checkbox = document.getElementById("input-is-fixed");
       const labelText = control.querySelector("span");
-      control.style.display = "inline-flex";
+      // 固定團改由泡泡列的「+ 新增」建立，表單裡不再提供這個開關。
+      control.style.display = "none";
       checkbox.disabled = !isSupported;
       control.title = isSupported ? "" : "請先將 GAS 表格更新為版本 2";
       if (labelText) labelText.textContent = isSupported ? "固定團" : "固定團（需更新）";
@@ -4261,7 +4355,145 @@
     }
 
     // --- 7. RENDER EVENTS & CARDS ---
+    // --- 興趣調查泡泡列 -----------------------------------------------------
+    // 資料就是原本的固定團（isFixedGroup）：標題是標籤、attendees 是有興趣的人。
+    // 沿用既有的建立、報名、刪除、移除成員流程，後端不需要另一套資料表。
+    const MAX_INTEREST_LABEL_LENGTH = 6;
+
+    function renderInterestBar() {
+      const bar = document.getElementById("interest-bar");
+      if (!bar) return;
+      bar.replaceChildren();
+
+      const tags = eventsData
+        .filter(evt => isFixedGroup(evt) && !isEventDeleted(evt))
+        .sort((a, b) => b.attendees.length - a.attendees.length ||
+          String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+
+      const myUserId = String(currentUser?.userId || "");
+      tags.forEach(evt => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        const mine = myUserId && evt.attendees.some(u => String(u.userId) === myUserId);
+        chip.className = "interest-chip" + (mine ? " is-mine" : "");
+        chip.title = evt.title;
+        const label = document.createElement("span");
+        label.className = "interest-chip-label";
+        label.textContent = evt.title;
+        const count = document.createElement("span");
+        count.className = "interest-chip-count";
+        count.textContent = String(evt.attendees.length);
+        chip.append(label, count);
+        chip.onclick = () => openDetailModal(evt.id);
+        bar.append(chip);
+      });
+
+      const addChip = document.createElement("button");
+      addChip.type = "button";
+      addChip.className = "interest-chip interest-chip-add";
+      addChip.textContent = "+ 新增";
+      addChip.onclick = createInterestTag;
+      bar.append(addChip);
+
+      if (currentUserCanDeleteAnyEvent && tags.length > 0) {
+        const resetChip = document.createElement("button");
+        resetChip.type = "button";
+        resetChip.className = "interest-chip interest-chip-reset";
+        resetChip.textContent = "重置人數";
+        resetChip.onclick = adminResetInterests;
+        bar.append(resetChip);
+      }
+    }
+
+    function createInterestTag() {
+      if (!ensureLoggedIn()) return;
+      if (!isDevMode && Number(serverSchemaVersion) < 2) {
+        alert("興趣調查的資料庫尚未完成更新，請稍後再試。");
+        return;
+      }
+      const input = prompt(`新增興趣標籤（${MAX_INTEREST_LABEL_LENGTH} 個字以內），例如：喝酒、運動、桌遊`);
+      if (input === null) return;
+      const title = input.trim();
+      if (!title) return;
+      if ([...title].length > MAX_INTEREST_LABEL_LENGTH) {
+        alert(`標籤最多 ${MAX_INTEREST_LABEL_LENGTH} 個字，請再短一點。`);
+        return;
+      }
+      const existing = eventsData.find(evt => isFixedGroup(evt) && !isEventDeleted(evt) && evt.title === title);
+      if (existing) {
+        alert(`已經有「${title}」了，直接點那顆就可以表示有興趣。`);
+        openDetailModal(existing.id);
+        return;
+      }
+
+      const newTag = {
+        id: "evt_" + Date.now(),
+        title: title,
+        datetime: "",
+        isFixedGroup: true,
+        isWish: false,
+        isHighlighted: false,
+        fixedTimeText: "",
+        location: "待定",
+        fee: "免費",
+        maxAttendees: 0,
+        description: "",
+        hostName: currentUser.displayName,
+        hostUser: currentUser,
+        status: "active",
+        deleted: false,
+        createdAt: new Date().toISOString(),
+        attendees: [currentUser],
+        fixedAttendees: [],
+        weeklyAttendees: [],
+        history: []
+      };
+      addHistoryLog(newTag, "新增興趣標籤", "create");
+      eventsData.push(newTag);
+      saveLocalEvents();
+      renderEvents();
+      showToast(`已新增「${title}」`);
+
+      sendPostToGAS({ action: "saveEvent", eventAction: "create", ...newTag }).then(result => {
+        if (result.ok) return;
+        eventsData = eventsData.filter(item => item.id !== newTag.id);
+        saveLocalEvents();
+        renderEvents();
+        alert(`新增標籤失敗。\n\n${result.message}`);
+      });
+    }
+
+    async function adminResetInterests() {
+      if (!currentUserCanDeleteAnyEvent) return;
+      const tags = eventsData.filter(evt => isFixedGroup(evt) && !isEventDeleted(evt));
+      const total = tags.reduce((sum, evt) => sum + evt.attendees.length, 0);
+      if (total === 0) {
+        alert("目前所有標籤都是 0 人。");
+        return;
+      }
+      if (!confirm(`確定要清空全部 ${tags.length} 個標籤、共 ${total} 人的興趣嗎？\n\n標籤會保留，人數歸零。此操作不可復原。`)) return;
+
+      const snapshots = tags.map(snapshotEventState);
+      tags.forEach(evt => { evt.attendees = []; });
+      saveLocalEvents();
+      renderEvents();
+
+      const result = await sendPostToGAS({ action: "adminResetInterests", adminPassword: currentAdminPassword });
+      if (!result.ok) {
+        snapshots.forEach(snap => {
+          const index = eventsData.findIndex(item => item.id === snap.id);
+          if (index >= 0) eventsData[index] = snap;
+        });
+        saveLocalEvents();
+        renderEvents();
+        alert(`重置失敗，已還原。\n\n${result.message}`);
+        return;
+      }
+      showToast(result.pending ? "重置已送出，雲端確認中" : "已重置所有興趣人數");
+    }
+
     function renderEvents() {
+      renderInterestBar();
       const listEl = document.getElementById("event-list");
       listEl.innerHTML = "";
 
@@ -4280,7 +4512,7 @@
       // 前端仍擋一次，避免活動剛好在兩次同步之間到達退場時間。
       const filteredEvents = sortedEvents.filter(evt => {
         if (isEventRetired(evt)) return false;
-        if (isFixedGroup(evt)) return activeFilters.has("fixed");
+        if (isFixedGroup(evt)) return false; // 興趣調查只顯示在上方泡泡列
         if (isWishEvent(evt)) return activeFilters.has("wish");
         return activeFilters.has("open");
       });
@@ -4431,14 +4663,14 @@
       const maxCapacity = getMaxAttendees(evt);
       const capacityText = `${evt.attendees.length}${maxCapacity > 0 ? "/" + maxCapacity : ""} 人`;
       const memberNames = evt.attendees.map(user => `@${user.displayName}`).join(" ") || "尚無";
-      return `【${isFixedGroup(evt) ? "固定團" : "活動"}：${evt.title}】
+      return `【${isFixedGroup(evt) ? "興趣調查" : "活動"}：${evt.title}】
 時間：${getEventTimeText(evt)}
 地點：${normalizeLocation(evt.location)}
 費用：${evt.fee || "免費"}
 主揪：${evt.hostName || evt.hostUser?.displayName || "未指定"}
 人數：${capacityText}
 活動說明：${evt.description || "尚無補充說明"}
-${isFixedGroup(evt) ? "本週參與" : "已報名成員"}：${memberNames}
+${isFixedGroup(evt) ? "有興趣" : "已報名成員"}：${memberNames}
 
 點此線上報名：
 ${getShareableUrl()}`;
@@ -4447,6 +4679,7 @@ ${getShareableUrl()}`;
     function broadcastOpenEvents() {
       const openEvents = eventsData
         .filter(evt => {
+          if (isFixedGroup(evt)) return false;
           const isEnded = isEventEnded(evt);
           const maxCap = getMaxAttendees(evt);
           const isFull = maxCap > 0 && evt.attendees.length >= maxCap;
@@ -4499,14 +4732,15 @@ ${pageUrl}`;
       let actionType = "";
       const snapshot = snapshotEventState(evt);
 
+      const interestTag = isFixedGroup(evt);
       if (existingIdx >= 0) {
-        if (isCurrentUserHost(evt)) {
+        if (!interestTag && isCurrentUserHost(evt)) {
           alert("主揪無法直接取消參加，請先到編輯內容將主揪交棒給其他已報名成員。");
           return;
         }
         evt.attendees.splice(existingIdx, 1);
         actionType = "cancel";
-        addHistoryLog(evt, "退出活動", "leave");
+        addHistoryLog(evt, interestTag ? "取消興趣" : "退出活動", "leave");
       } else {
         const maxCap = getMaxAttendees(evt);
         if (maxCap > 0 && evt.attendees.length >= maxCap) {
@@ -4520,7 +4754,7 @@ ${pageUrl}`;
         }
 
         actionType = "join";
-        addHistoryLog(evt, "報名參加活動", "join");
+        addHistoryLog(evt, interestTag ? "表示有興趣" : "報名參加活動", "join");
       }
 
       // 每場活動只防止短時間雙擊，不再等待網路或鎖住整個頁面。
@@ -4529,7 +4763,9 @@ ${pageUrl}`;
 
       saveLocalEvents();
       renderEvents();
-      triggerAutoCopyAndAlert(evt, actionType);
+      // 表態興趣不需要通知群組，只有一般活動的報名才複製通知文字。
+      if (interestTag) showToast(actionType === "join" ? "已表示有興趣" : "已取消興趣");
+      else triggerAutoCopyAndAlert(evt, actionType);
 
       sendPostToGAS({
         action: "toggleRSVP",
@@ -5068,8 +5304,23 @@ ${pageUrl}`;
       editBtn.style.display = canEdit ? "flex" : "none";
       document.getElementById("detail-desc").innerText = evt.description || "尚無補充說明。";
       document.getElementById("detail-attendee-heading").innerText = isFixedGroup(evt)
-        ? "固定團參與名冊"
+        ? "有興趣的人"
         : "已報名成員名冊";
+
+      // 興趣調查沒有卡片上的報名鈕，表態改在詳情視窗按。
+      const interestBtn = document.getElementById("btn-toggle-interest");
+      if (isFixedGroup(evt)) {
+        const mine = currentUser && evt.attendees.some(u => String(u.userId) === String(currentUser.userId));
+        interestBtn.style.display = "flex";
+        interestBtn.className = `line-btn ${mine ? "btn-cancel" : "btn-join"}`;
+        interestBtn.innerText = mine ? "取消興趣" : "我有興趣";
+        interestBtn.onclick = () => {
+          toggleRSVP(evt.id);
+          if (eventsData.some(item => item.id === evt.id)) openDetailModal(evt.id);
+        };
+      } else {
+        interestBtn.style.display = "none";
+      }
       document.getElementById("detail-capacity-text").innerText = 
         `${evt.attendees.length}${maxCap > 0 ? '/' + maxCap : ''}`;
 

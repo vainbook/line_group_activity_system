@@ -543,6 +543,9 @@ function doPost(e) {
         break;
       // 打卡相關 action 收 spreadsheet 而非 eventsSheet：Members 表在各自函式內部才取，
       // 避免舊試算表（還沒建 Members）連帶讓所有活動操作失敗。
+      case "adminResetInterests":
+        result = adminResetInterests_(eventsSheet, auditSheet, payload);
+        break;
       case "checkIn":
         result = checkIn_(spreadsheet, auditSheet, payload);
         break;
@@ -766,7 +769,8 @@ function updateRsvp_(eventsSheet, auditSheet, payload) {
     : (existingIndex >= 0 ? "cancel" : "join");
 
   if (intent === "cancel") {
-    if (String(getHostUserId_(eventItem)) === userId) {
+    // 興趣調查（isFixedGroup）只是表態，發起人也可以自己取消；一般活動的主揪仍須先交棒。
+    if (eventItem.isFixedGroup !== true && String(getHostUserId_(eventItem)) === userId) {
       throw new Error("主揪必須先交棒，才能退出活動。");
     }
     if (existingIndex >= 0) attendees.splice(existingIndex, 1);
@@ -927,6 +931,43 @@ function countActiveHighlightedEvents_(events, excludedEventId) {
     !isDeletedEvent_(item) &&
     !isEventEnded_(item)
   ).length;
+}
+
+/**
+ * 管理員一鍵清空所有興趣調查標籤的人數（標籤保留）。用於定期重置意願調查。
+ */
+function adminResetInterests_(eventsSheet, auditSheet, payload) {
+  assertAdminPermission_(payload);
+  const now = new Date().toISOString();
+  let tagCount = 0;
+  let clearedCount = 0;
+  readAllEventsWithRows_(eventsSheet).forEach(item => {
+    const eventItem = item.event;
+    if (eventItem.isFixedGroup !== true || isDeletedEvent_(eventItem)) return;
+    const people = normalizeUsers_(eventItem.attendees).length;
+    if (people === 0) return;
+    eventItem.attendees = [];
+    eventItem.history = mergeHistoryEntries_(eventItem.history, {
+      id: "hist_reset_" + Date.now() + "_" + tagCount,
+      author: String(payload.actorName || "管理員"),
+      time: Utilities.formatDate(new Date(now), Session.getScriptTimeZone(), "MM/dd HH:mm"),
+      timestamp: now,
+      type: "admin_reset",
+      action: "管理員重置興趣名單"
+    });
+    eventItem.updatedAt = now;
+    writeEvent_(eventsSheet, item.rowNumber, eventItem);
+    tagCount += 1;
+    clearedCount += people;
+  });
+
+  appendAudit_(auditSheet, payload, {
+    eventId: "",
+    actionType: "admin_reset_interests",
+    action: "重置全部興趣調查，" + tagCount + " 個標籤共 " + clearedCount + " 人",
+    details: { tagCount: tagCount, clearedCount: clearedCount }
+  });
+  return { reset: tagCount, cleared: clearedCount };
 }
 
 function adminRemoveAttendee_(eventsSheet, auditSheet, payload) {
