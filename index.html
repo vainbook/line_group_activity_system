@@ -798,20 +798,38 @@
     /* 興趣調查泡泡列。可左右滑，不換行；名稱太長就省略，維持泡泡大小一致。 */
     .interest-bar {
       display: flex;
+      align-items: center;
       gap: 8px;
-      overflow-x: auto;
-      padding: 2px 2px 10px;
+      padding: 2px 0 10px;
       margin-bottom: 4px;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .interest-bar::-webkit-scrollbar {
-      display: none;
     }
 
     .interest-bar:empty {
       display: none;
+    }
+
+    /* 泡泡軌道：超出寬度時由 JS 自動慢速捲動（跑馬燈），也可以手動滑。兩端淡出。 */
+    .interest-track {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 2px 0;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    }
+
+    .interest-track::-webkit-scrollbar {
+      display: none;
+    }
+
+    .interest-actions {
+      flex: 0 0 auto;
+      display: flex;
+      gap: 6px;
     }
 
     .interest-chip {
@@ -822,15 +840,15 @@
       min-height: 36px;
       max-width: 150px;
       padding: 4px 6px 4px 14px;
-      border: 2px solid #fbcfe8;
+      border: 1.5px solid var(--ic-soft, #fce7f3);
       border-radius: 999px;
-      background: #fff5fa;
-      color: #9d174d;
+      background: var(--ic-bg, #fff8fb);
+      color: var(--ic-fg, #9d174d);
       font-family: var(--font-line);
       font-size: 14px;
       font-weight: 800;
       cursor: pointer;
-      box-shadow: 0 3px 10px rgba(190, 24, 93, 0.12);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
       transition: transform 0.15s;
     }
 
@@ -850,29 +868,38 @@
       height: 24px;
       padding: 0 6px;
       border-radius: 999px;
-      background: #fbcfe8;
-      color: #831843;
+      background: rgba(255, 255, 255, 0.85);
+      color: var(--ic-fg, #9d174d);
       font-size: 12.5px;
       line-height: 24px;
       text-align: center;
     }
 
-    /* 自己有興趣的那顆變實心 */
-    .interest-chip.is-mine {
-      background: #ec4899;
-      border-color: #ec4899;
-      color: #ffffff;
-    }
+    /* 彩虹七色，全部粉嫩底＋同色系深字。紅、綠刻意偏玫瑰與萊姆，
+       避免跟「揪團已滿」的紅、「揪團中」的綠混淆。顏色由標籤 ID 決定，見 getInterestColorIndex。 */
+    .ic-0 { --ic-bg: #fff1f2; --ic-soft: #ffe4e6; --ic-fg: #9f1239; --ic-line: #fb7185; }
+    .ic-1 { --ic-bg: #fff7ed; --ic-soft: #ffedd5; --ic-fg: #9a3412; --ic-line: #fb923c; }
+    .ic-2 { --ic-bg: #fefce8; --ic-soft: #fef9c3; --ic-fg: #854d0e; --ic-line: #eab308; }
+    .ic-3 { --ic-bg: #f7fee7; --ic-soft: #ecfccb; --ic-fg: #3f6212; --ic-line: #84cc16; }
+    .ic-4 { --ic-bg: #eff6ff; --ic-soft: #dbeafe; --ic-fg: #1e40af; --ic-line: #60a5fa; }
+    .ic-5 { --ic-bg: #eef2ff; --ic-soft: #e0e7ff; --ic-fg: #3730a3; --ic-line: #818cf8; }
+    .ic-6 { --ic-bg: #faf5ff; --ic-soft: #f3e8ff; --ic-fg: #6b21a8; --ic-line: #c084fc; }
 
-    .interest-chip.is-mine .interest-chip-count {
-      background: #ffffff;
-      color: #be185d;
+    /* 自己有興趣：只換成同色系的粗外框，其他不變。內距同步減少，泡泡大小不跳動。 */
+    .interest-chip.is-mine {
+      border: 3px solid var(--ic-line, #f9a8d4);
+      padding: 2.5px 4.5px 2.5px 12.5px;
     }
 
     .interest-chip-add {
-      padding: 4px 14px;
+      width: 36px;
+      justify-content: center;
+      padding: 0;
       border-style: dashed;
-      background: rgba(255, 255, 255, 0.75);
+      border-color: #f9a8d4;
+      background: rgba(255, 255, 255, 0.8);
+      font-size: 20px;
+      line-height: 1;
       box-shadow: none;
     }
 
@@ -1867,7 +1894,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-12T17:50:21+08:00">v261012.1750</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-12T18:07:11+08:00">v261012.1807</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2361,7 +2388,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261012.1750", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261012.1807", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4360,9 +4387,54 @@
     // 沿用既有的建立、報名、刪除、移除成員流程，後端不需要另一套資料表。
     const MAX_INTEREST_LABEL_LENGTH = 6;
 
+    // 用標籤 ID 算出彩虹色。看起來是隨機分配，但同一個標籤每次、每個人看到都是同一色，
+    // 不需要後端存顏色；若用 Math.random，每 60 秒同步重畫時顏色就會跳。
+    const INTEREST_COLOR_COUNT = 7;
+    function getInterestColorIndex(id) {
+      let hash = 0;
+      for (const ch of String(id || "")) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+      return hash % INTEREST_COLOR_COUNT;
+    }
+
+    // 相鄰兩顆同色就往後挪一色，避免撞色；第一顆也避開最後一顆（跑馬燈循環時會接在一起）。
+    function assignInterestColors(tags) {
+      const colors = [];
+      tags.forEach((evt, index) => {
+        let color = getInterestColorIndex(evt.id);
+        const prev = index > 0 ? colors[index - 1] : null;
+        const isLast = index === tags.length - 1 && tags.length > 2;
+        while (color === prev || (isLast && color === colors[0])) color = (color + 1) % INTEREST_COLOR_COUNT;
+        colors.push(color);
+      });
+      return colors;
+    }
+
+    function buildInterestChip(evt, myUserId, isClone, colorIndex) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      const mine = myUserId && evt.attendees.some(u => String(u.userId) === myUserId);
+      chip.className = `interest-chip ic-${colorIndex}` + (mine ? " is-mine" : "");
+      chip.title = evt.title;
+      const label = document.createElement("span");
+      label.className = "interest-chip-label";
+      label.textContent = evt.title;
+      const count = document.createElement("span");
+      count.className = "interest-chip-count";
+      count.textContent = String(evt.attendees.length);
+      chip.append(label, count);
+      chip.onclick = () => openDetailModal(evt.id);
+      // 跑馬燈循環用的複本：視覺上存在，但不重複出現在讀屏與鍵盤順序裡。
+      if (isClone) {
+        chip.setAttribute("aria-hidden", "true");
+        chip.tabIndex = -1;
+      }
+      return chip;
+    }
+
     function renderInterestBar() {
       const bar = document.getElementById("interest-bar");
       if (!bar) return;
+      const previousScroll = interestMarquee.track ? interestMarquee.track.scrollLeft : 0;
       bar.replaceChildren();
 
       const tags = eventsData
@@ -4371,38 +4443,85 @@
           String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
 
       const myUserId = String(currentUser?.userId || "");
-      tags.forEach(evt => {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        const mine = myUserId && evt.attendees.some(u => String(u.userId) === myUserId);
-        chip.className = "interest-chip" + (mine ? " is-mine" : "");
-        chip.title = evt.title;
-        const label = document.createElement("span");
-        label.className = "interest-chip-label";
-        label.textContent = evt.title;
-        const count = document.createElement("span");
-        count.className = "interest-chip-count";
-        count.textContent = String(evt.attendees.length);
-        chip.append(label, count);
-        chip.onclick = () => openDetailModal(evt.id);
-        bar.append(chip);
-      });
+      const track = document.createElement("div");
+      track.className = "interest-track";
+      const colors = assignInterestColors(tags);
+      tags.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, false, colors[i])));
 
+      const actions = document.createElement("div");
+      actions.className = "interest-actions";
       const addChip = document.createElement("button");
       addChip.type = "button";
       addChip.className = "interest-chip interest-chip-add";
-      addChip.textContent = "+ 新增";
+      addChip.textContent = "+";
+      addChip.title = "新增興趣標籤";
+      addChip.setAttribute("aria-label", "新增興趣標籤");
       addChip.onclick = createInterestTag;
-      bar.append(addChip);
+      actions.append(addChip);
 
       if (currentUserCanDeleteAnyEvent && tags.length > 0) {
         const resetChip = document.createElement("button");
         resetChip.type = "button";
         resetChip.className = "interest-chip interest-chip-reset";
-        resetChip.textContent = "重置人數";
+        resetChip.textContent = "重置";
+        resetChip.title = "清空所有標籤的人數";
         resetChip.onclick = adminResetInterests;
-        bar.append(resetChip);
+        actions.append(resetChip);
       }
+
+      bar.append(track, actions);
+
+      // 只有塞不下時才跑馬燈：補一份複本讓捲到一半時能無縫接回開頭。
+      interestMarquee.track = track;
+      interestMarquee.loopWidth = 0;
+      if (tags.length > 0 && track.scrollWidth > track.clientWidth + 1) {
+        const firstWidth = track.scrollWidth;
+        tags.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, true, colors[i])));
+        interestMarquee.loopWidth = track.scrollWidth - firstWidth; // 第一顆到它複本的距離
+        if (!interestMarquee.loopWidth || interestMarquee.loopWidth <= 0) interestMarquee.loopWidth = firstWidth;
+        track.scrollLeft = previousScroll % interestMarquee.loopWidth;
+        interestMarquee.offset = track.scrollLeft;
+        const pause = () => { interestMarquee.pausedUntil = Infinity; };
+        const resumeLater = () => { interestMarquee.pausedUntil = performance.now() + 3000; };
+        track.addEventListener("pointerdown", pause);
+        track.addEventListener("touchstart", pause, { passive: true });
+        track.addEventListener("pointerup", resumeLater);
+        track.addEventListener("pointercancel", resumeLater);
+        track.addEventListener("touchend", resumeLater, { passive: true });
+        track.addEventListener("wheel", resumeLater, { passive: true });
+        startInterestMarquee();
+      }
+    }
+
+    // 跑馬燈狀態只有一份，renderInterestBar 每次重畫時更新 track，不會疊出多個動畫迴圈。
+    // offset 是浮點累加值：每幀只移動不到 1px，直接對 scrollLeft 加小數會被瀏覽器捨掉而停住。
+    const interestMarquee = { track: null, loopWidth: 0, pausedUntil: 0, running: false, lastTime: 0, offset: 0 };
+    const INTEREST_MARQUEE_SPEED = 22; // px／秒，慢到看得清、點得到
+
+    function startInterestMarquee() {
+      if (interestMarquee.running) return;
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      interestMarquee.running = true;
+      interestMarquee.lastTime = performance.now();
+      const step = now => {
+        const { track, loopWidth } = interestMarquee;
+        if (!track || !track.isConnected || !loopWidth) {
+          interestMarquee.running = false;
+          return;
+        }
+        const elapsed = Math.min(now - interestMarquee.lastTime, 100);
+        interestMarquee.lastTime = now;
+        if (now >= interestMarquee.pausedUntil && document.visibilityState !== "hidden") {
+          interestMarquee.offset += (INTEREST_MARQUEE_SPEED * elapsed) / 1000;
+          if (interestMarquee.offset >= loopWidth) interestMarquee.offset -= loopWidth;
+          track.scrollLeft = interestMarquee.offset;
+        } else {
+          // 暫停期間使用者可能手動滑過，恢復時從他停下的位置接著跑。
+          interestMarquee.offset = track.scrollLeft % loopWidth;
+        }
+        requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
     }
 
     function createInterestTag() {
