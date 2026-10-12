@@ -1939,7 +1939,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-12T19:40:13+08:00">v261012.1940</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-12T20:07:50+08:00">v261012.2007</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2229,10 +2229,10 @@
       <form id="form-edit-event" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
         <div class="modal-form-body">
           <div class="form-group">
-            <label class="form-label" for="edit-title">活動名稱 *</label>
+            <label id="edit-title-label" class="form-label" for="edit-title">活動名稱 *</label>
             <input type="text" id="edit-title" class="line-input" required>
           </div>
-          <div class="form-group">
+          <div class="form-group edit-event-only">
             <div class="form-label">日期與時間 *</div>
             <div id="edit-standard-time" class="datetime-picker-grid">
               <label class="datetime-picker-field">
@@ -2261,15 +2261,15 @@
               </label>
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group edit-event-only">
             <label class="form-label" for="edit-location">活動地點 (選填)</label>
             <input type="text" id="edit-location" class="line-input">
           </div>
-          <div class="form-group">
+          <div class="form-group edit-event-only">
             <label class="form-label" for="edit-fee">活動費用</label>
             <input type="text" id="edit-fee" class="line-input">
           </div>
-          <div class="form-group">
+          <div class="form-group edit-event-only">
             <label class="form-label" for="edit-max">人數上限 (0 代表無限制)</label>
             <input type="number" id="edit-max" class="line-input" min="0">
           </div>
@@ -2286,7 +2286,7 @@
         </div>
         <div class="modal-footer" style="display:flex; gap:10px;">
           <button type="button" class="line-btn btn-detail" style="flex:1;" data-close="modal-edit">取消</button>
-          <button type="submit" class="line-btn btn-join" style="flex:1.5; padding:10px;">儲存並更新通報</button>
+          <button id="btn-submit-edit" type="submit" class="line-btn btn-join" style="flex:1.5; padding:10px;">儲存並更新通報</button>
         </div>
       </form>
     </div>
@@ -2450,7 +2450,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261012.1940", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261012.2007", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -3233,6 +3233,17 @@
       fixedTimeInput.required = false;
       fixedTimeInput.value = fixed ? String(evt.fixedTimeText || "") : "";
       if (!fixed) setDateTimePickerValue("edit", evt.datetime);
+
+      // 興趣調查的編輯只留名稱、主揪與說明；被隱藏的欄位仍保留原值，儲存時原樣送回。
+      document.querySelectorAll("#modal-edit .edit-event-only").forEach(group => {
+        group.style.display = fixed ? "none" : "";
+      });
+      document.getElementById("title-edit-event").innerText = fixed ? "編輯興趣標籤" : "編輯活動內容";
+      document.getElementById("edit-title-label").innerText = fixed ? "標籤名稱 *" : "活動名稱 *";
+      document.getElementById("btn-submit-edit").innerText = fixed ? "儲存" : "儲存並更新通報";
+      const titleInput = document.getElementById("edit-title");
+      if (fixed) titleInput.maxLength = MAX_INTEREST_LABEL_LENGTH;
+      else titleInput.removeAttribute("maxlength");
     }
 
     function checkDevModeVisibility() {
@@ -5327,6 +5338,11 @@ ${pageUrl}`;
 
       const newTitle = document.getElementById("edit-title").value.trim();
       const fixedGroup = isFixedGroup(evt);
+      // maxlength 擋不住舊的長名稱，送出時再檢查一次。
+      if (fixedGroup && [...newTitle].length > MAX_INTEREST_LABEL_LENGTH) {
+        alert(`標籤名稱最多 ${MAX_INTEREST_LABEL_LENGTH} 個字，請再短一點。`);
+        return;
+      }
       const newDatetime = fixedGroup ? "" : getDateTimePickerValue("edit");
       const newFixedTimeText = fixedGroup
         ? document.getElementById("edit-fixed-time").value.trim()
@@ -5416,7 +5432,9 @@ ${pageUrl}`;
 
       openDetailModal(evt.id);
 
-      triggerAutoCopyAndAlert(evt, "update");
+      // 興趣標籤改名不需要通知群組。
+      if (isFixedGroup(evt)) showToast("已更新興趣標籤");
+      else triggerAutoCopyAndAlert(evt, "update");
     });
 
     async function toggleEventHighlight(eventId) {
@@ -5665,6 +5683,7 @@ ${pageUrl}`;
       highlightBtn.style.display = isFixedGroup(evt) ? "none" : "";
 
       const deleteBtn = document.getElementById("btn-delete-event");
+      deleteBtn.innerText = isFixedGroup(evt) ? "刪除標籤" : "刪除活動";
       if (canDelete) {
         deleteBtn.style.display = "block";
         deleteBtn.onclick = async () => {
