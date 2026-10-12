@@ -800,8 +800,8 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 2px 0 10px;
-      margin-bottom: 4px;
+      /* 上方吃掉篩選列一部分下緣留白，讓上下間距接近活動卡片之間的距離 */
+      margin: -4px 0 10px;
     }
 
     .interest-bar:empty {
@@ -818,6 +818,10 @@
       padding: 2px 0;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+    }
+
+    /* 兩端淡出只在跑馬燈啟動時才有，靜止時不能切到第一顆泡泡 */
+    .interest-track.is-marquee {
       -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
       mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
     }
@@ -895,12 +899,53 @@
       width: 36px;
       justify-content: center;
       padding: 0;
-      border-style: dashed;
-      border-color: #f9a8d4;
-      background: rgba(255, 255, 255, 0.8);
-      font-size: 20px;
+      border: none;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.95);
+      font-size: 24px;
+      font-weight: 700;
       line-height: 1;
       box-shadow: none;
+    }
+
+    /* 新增標籤的小視窗：手機上也置中（鍵盤彈出時底部會被擋），不像其他 modal 那樣由下彈出。
+       要兩個 class 才蓋得過後面定義的 .modal-overlay。 */
+    .modal-overlay.interest-new-overlay {
+      align-items: center;
+      padding: 20px;
+    }
+
+    .modal-box.interest-new-box {
+      height: auto;
+      max-height: none;
+      max-width: 340px;
+      border-radius: 20px;
+      padding: 20px 18px 16px;
+      gap: 10px;
+    }
+
+    .interest-new-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .interest-new-help {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--line-text-sub);
+    }
+
+    .interest-new-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .interest-new-actions .line-btn {
+      flex: 1;
+      justify-content: center;
     }
 
     .interest-chip-reset {
@@ -1894,7 +1939,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-12T18:07:11+08:00">v261012.1807</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-12T18:12:50+08:00">v261012.1812</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -1960,6 +2005,23 @@
     <button id="fab-add-event" class="fab-btn fab-add">
       <span>揪團</span>
     </button>
+  </div>
+
+  <!-- Modal: 新增興趣標籤（置中小視窗，取代原生 prompt） -->
+  <div id="modal-interest-new" class="modal-overlay interest-new-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="title-interest-new">
+    <form id="form-interest-new" class="modal-box interest-new-box">
+      <div class="interest-new-title" id="title-interest-new">新增興趣標籤</div>
+      <input id="input-interest-label" class="line-input" type="text" maxlength="6" autocomplete="off"
+             placeholder="例如：喝酒、運動、桌遊" aria-describedby="interest-new-help">
+      <div id="interest-new-help" class="interest-new-help">
+        <span>6 個字以內，大家都能按有興趣</span>
+        <span><span id="interest-label-count">0</span>/6</span>
+      </div>
+      <div class="interest-new-actions">
+        <button type="button" class="line-btn btn-detail" data-close="modal-interest-new">取消</button>
+        <button type="submit" class="line-btn btn-join">新增</button>
+      </div>
+    </form>
   </div>
 
   <!-- Modal: Check-in (打卡紀錄) -->
@@ -2388,7 +2450,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261012.1807", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261012.1812", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4481,6 +4543,7 @@
         if (!interestMarquee.loopWidth || interestMarquee.loopWidth <= 0) interestMarquee.loopWidth = firstWidth;
         track.scrollLeft = previousScroll % interestMarquee.loopWidth;
         interestMarquee.offset = track.scrollLeft;
+        track.classList.add("is-marquee");
         const pause = () => { interestMarquee.pausedUntil = Infinity; };
         const resumeLater = () => { interestMarquee.pausedUntil = performance.now() + 3000; };
         track.addEventListener("pointerdown", pause);
@@ -4496,7 +4559,7 @@
     // 跑馬燈狀態只有一份，renderInterestBar 每次重畫時更新 track，不會疊出多個動畫迴圈。
     // offset 是浮點累加值：每幀只移動不到 1px，直接對 scrollLeft 加小數會被瀏覽器捨掉而停住。
     const interestMarquee = { track: null, loopWidth: 0, pausedUntil: 0, running: false, lastTime: 0, offset: 0 };
-    const INTEREST_MARQUEE_SPEED = 22; // px／秒，慢到看得清、點得到
+    const INTEREST_MARQUEE_SPEED = 12; // px／秒。22 實機看太快，12 才看得清、點得到
 
     function startInterestMarquee() {
       if (interestMarquee.running) return;
@@ -4524,26 +4587,38 @@
       requestAnimationFrame(step);
     }
 
+    // 原生 prompt 在手機上會露出網址列文字、樣式不搭，部分 LINE 瀏覽器還會擋，改用自己的小視窗。
     function createInterestTag() {
       if (!ensureLoggedIn()) return;
       if (!isDevMode && Number(serverSchemaVersion) < 2) {
         alert("興趣調查的資料庫尚未完成更新，請稍後再試。");
         return;
       }
-      const input = prompt(`新增興趣標籤（${MAX_INTEREST_LABEL_LENGTH} 個字以內），例如：喝酒、運動、桌遊`);
-      if (input === null) return;
-      const title = input.trim();
-      if (!title) return;
+      const input = document.getElementById("input-interest-label");
+      input.value = "";
+      document.getElementById("interest-label-count").innerText = "0";
+      openModal("modal-interest-new");
+      setTimeout(() => input.focus(), 60);
+    }
+
+    function submitInterestTag() {
+      const title = document.getElementById("input-interest-label").value.trim();
+      if (!title) {
+        document.getElementById("input-interest-label").focus();
+        return;
+      }
       if ([...title].length > MAX_INTEREST_LABEL_LENGTH) {
         alert(`標籤最多 ${MAX_INTEREST_LABEL_LENGTH} 個字，請再短一點。`);
         return;
       }
       const existing = eventsData.find(evt => isFixedGroup(evt) && !isEventDeleted(evt) && evt.title === title);
       if (existing) {
-        alert(`已經有「${title}」了，直接點那顆就可以表示有興趣。`);
+        closeModal("modal-interest-new");
+        showToast(`已經有「${title}」了\n直接點那顆就可以表示有興趣`);
         openDetailModal(existing.id);
         return;
       }
+      closeModal("modal-interest-new");
 
       const newTag = {
         id: "evt_" + Date.now(),
@@ -5704,6 +5779,14 @@ ${pageUrl}`;
       document.getElementById("btn-open-calendar").onclick = openCalendarModal;
 
       document.getElementById("btn-open-checkin").onclick = openCheckinModal;
+
+      document.getElementById("form-interest-new").addEventListener("submit", e => {
+        e.preventDefault();
+        submitInterestTag();
+      });
+      document.getElementById("input-interest-label").addEventListener("input", e => {
+        document.getElementById("interest-label-count").innerText = String([...e.target.value].length);
+      });
       document.getElementById("btn-submit-checkin").onclick = submitCheckIn;
       document.getElementById("btn-reset-checkins").onclick = adminResetCheckIns;
       document.getElementById("btn-mention-members").onclick = copyCheckinMentions;
