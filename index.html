@@ -809,8 +809,17 @@
     }
 
     /* 泡泡軌道：超出寬度時由 JS 自動慢速捲動（跑馬燈），也可以手動滑。兩端淡出。 */
-    .interest-track {
+    /* 一排或兩排泡泡的容器，「＋」固定在右側並上下置中 */
+    .interest-rows {
       flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .interest-track {
+      flex: 0 0 auto;
       min-width: 0;
       display: flex;
       gap: 8px;
@@ -1939,7 +1948,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-12T20:07:50+08:00">v261012.2007</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-13T19:55:16+08:00">v261013.1955</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2450,7 +2459,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261012.2007", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261013.1955", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4507,7 +4516,7 @@
     function renderInterestBar() {
       const bar = document.getElementById("interest-bar");
       if (!bar) return;
-      const previousScroll = interestMarquee.track ? interestMarquee.track.scrollLeft : 0;
+      const previousScrolls = interestMarquee.rows.map(row => row.track.scrollLeft);
       bar.replaceChildren();
 
       const tags = eventsData
@@ -4516,10 +4525,8 @@
           String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
 
       const myUserId = String(currentUser?.userId || "");
-      const track = document.createElement("div");
-      track.className = "interest-track";
-      const colors = assignInterestColors(tags);
-      tags.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, false, colors[i])));
+      const rowsEl = document.createElement("div");
+      rowsEl.className = "interest-rows";
 
       const actions = document.createElement("div");
       actions.className = "interest-actions";
@@ -4542,34 +4549,57 @@
         actions.append(resetChip);
       }
 
-      bar.append(track, actions);
+      bar.append(rowsEl, actions);
 
-      // 只有塞不下時才跑馬燈：補一份複本讓捲到一半時能無縫接回開頭。
-      interestMarquee.track = track;
-      interestMarquee.loopWidth = 0;
-      if (tags.length > 0 && track.scrollWidth > track.clientWidth + 1) {
+      // 先把全部泡泡排成一排量總寬度，再決定要一排還是兩排。
+      // 泡泡大小不變；只是總長超過兩排的量時，往下多長一排，兩排各自跑馬燈。
+      const measure = document.createElement("div");
+      measure.className = "interest-track";
+      tags.forEach(evt => measure.append(buildInterestChip(evt, myUserId, false, 0)));
+      rowsEl.append(measure);
+      const useTwoRows = tags.length >= 4 && measure.scrollWidth > measure.clientWidth * 2;
+      rowsEl.replaceChildren();
+
+      // 兩排時交錯分配：第 1、3、5…名在上排，第 2、4、6…名在下排，熱門的兩排開頭都看得到。
+      const rowTags = useTwoRows
+        ? [tags.filter((_, i) => i % 2 === 0), tags.filter((_, i) => i % 2 === 1)]
+        : [tags];
+
+      interestMarquee.rows = [];
+      rowTags.forEach((list, rowIndex) => {
+        const track = document.createElement("div");
+        track.className = "interest-track";
+        const colors = assignInterestColors(list);
+        list.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, false, colors[i])));
+        rowsEl.append(track);
+
+        // 只有塞不下時才跑：補一份複本，捲到一半時無縫接回開頭。
+        if (list.length === 0 || track.scrollWidth <= track.clientWidth + 1) return;
         const firstWidth = track.scrollWidth;
-        tags.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, true, colors[i])));
-        interestMarquee.loopWidth = track.scrollWidth - firstWidth; // 第一顆到它複本的距離
-        if (!interestMarquee.loopWidth || interestMarquee.loopWidth <= 0) interestMarquee.loopWidth = firstWidth;
-        track.scrollLeft = previousScroll % interestMarquee.loopWidth;
-        interestMarquee.offset = track.scrollLeft;
+        list.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, true, colors[i])));
+        const loopWidth = (track.scrollWidth - firstWidth) || firstWidth; // 第一顆到它複本的距離
+        track.scrollLeft = (previousScrolls[rowIndex] || 0) % loopWidth;
         track.classList.add("is-marquee");
+        interestMarquee.rows.push({ track, loopWidth, offset: track.scrollLeft });
+      });
+
+      if (interestMarquee.rows.length > 0) {
+        // 碰任何一排兩排一起停，放開 3 秒後一起續跑。
         const pause = () => { interestMarquee.pausedUntil = Infinity; };
         const resumeLater = () => { interestMarquee.pausedUntil = performance.now() + 3000; };
-        track.addEventListener("pointerdown", pause);
-        track.addEventListener("touchstart", pause, { passive: true });
-        track.addEventListener("pointerup", resumeLater);
-        track.addEventListener("pointercancel", resumeLater);
-        track.addEventListener("touchend", resumeLater, { passive: true });
-        track.addEventListener("wheel", resumeLater, { passive: true });
+        rowsEl.addEventListener("pointerdown", pause);
+        rowsEl.addEventListener("touchstart", pause, { passive: true });
+        rowsEl.addEventListener("pointerup", resumeLater);
+        rowsEl.addEventListener("pointercancel", resumeLater);
+        rowsEl.addEventListener("touchend", resumeLater, { passive: true });
+        rowsEl.addEventListener("wheel", resumeLater, { passive: true });
         startInterestMarquee();
       }
     }
 
-    // 跑馬燈狀態只有一份，renderInterestBar 每次重畫時更新 track，不會疊出多個動畫迴圈。
+    // 跑馬燈狀態只有一份，renderInterestBar 每次重畫時換掉 rows，不會疊出多個動畫迴圈。
     // offset 是浮點累加值：每幀只移動不到 1px，直接對 scrollLeft 加小數會被瀏覽器捨掉而停住。
-    const interestMarquee = { track: null, loopWidth: 0, pausedUntil: 0, running: false, lastTime: 0, offset: 0 };
+    const interestMarquee = { rows: [], pausedUntil: 0, running: false, lastTime: 0 };
     const INTEREST_MARQUEE_SPEED = 12; // px／秒。22 實機看太快，12 才看得清、點得到
 
     function startInterestMarquee() {
@@ -4578,21 +4608,24 @@
       interestMarquee.running = true;
       interestMarquee.lastTime = performance.now();
       const step = now => {
-        const { track, loopWidth } = interestMarquee;
-        if (!track || !track.isConnected || !loopWidth) {
+        const rows = interestMarquee.rows.filter(row => row.track.isConnected && row.loopWidth > 0);
+        if (rows.length === 0) {
           interestMarquee.running = false;
           return;
         }
         const elapsed = Math.min(now - interestMarquee.lastTime, 100);
         interestMarquee.lastTime = now;
-        if (now >= interestMarquee.pausedUntil && document.visibilityState !== "hidden") {
-          interestMarquee.offset += (INTEREST_MARQUEE_SPEED * elapsed) / 1000;
-          if (interestMarquee.offset >= loopWidth) interestMarquee.offset -= loopWidth;
-          track.scrollLeft = interestMarquee.offset;
-        } else {
-          // 暫停期間使用者可能手動滑過，恢復時從他停下的位置接著跑。
-          interestMarquee.offset = track.scrollLeft % loopWidth;
-        }
+        const moving = now >= interestMarquee.pausedUntil && document.visibilityState !== "hidden";
+        rows.forEach(row => {
+          if (moving) {
+            row.offset += (INTEREST_MARQUEE_SPEED * elapsed) / 1000;
+            if (row.offset >= row.loopWidth) row.offset -= row.loopWidth;
+            row.track.scrollLeft = row.offset;
+          } else {
+            // 暫停期間使用者可能手動滑過，恢復時從他停下的位置接著跑。
+            row.offset = row.track.scrollLeft % row.loopWidth;
+          }
+        });
         requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
