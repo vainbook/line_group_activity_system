@@ -801,7 +801,7 @@
       align-items: center;
       gap: 8px;
       /* 上方吃掉篩選列一部分下緣留白，讓上下間距接近活動卡片之間的距離 */
-      margin: -4px 0 10px;
+      margin: -8px 0 6px;
     }
 
     .interest-bar:empty {
@@ -815,7 +815,7 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 0;
     }
 
     .interest-track {
@@ -824,15 +824,17 @@
       display: flex;
       gap: 8px;
       overflow-x: auto;
-      padding: 2px 0;
+      /* 上下留給泡泡陰影，太小陰影會被 overflow 切得很硬 */
+      padding: 4px 0 6px;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
     }
 
     /* 兩端淡出只在跑馬燈啟動時才有，靜止時不能切到第一顆泡泡 */
+    /* 淡出要夠長，泡泡才是慢慢隱去；12px 太短，看起來像被切掉再蓋一層霧 */
     .interest-track.is-marquee {
-      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
-      mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
     }
 
     .interest-track::-webkit-scrollbar {
@@ -1948,7 +1950,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-13T19:55:16+08:00">v261013.1955</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-13T21:43:29+08:00">v261013.2143</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2459,7 +2461,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261013.1955", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261013.2143", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
