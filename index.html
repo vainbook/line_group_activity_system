@@ -796,12 +796,11 @@
     }
 
     /* 興趣調查泡泡列。可左右滑，不換行；名稱太長就省略，維持泡泡大小一致。 */
+    /* 泡泡列延伸到螢幕左右邊緣（抵銷 .container 的 16px），泡泡直接從螢幕邊滑進滑出。
+       不用半透明淡出：粉色泡泡疊在藍底上淡出會變成一層灰霧，看起來很假。 */
     .interest-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      /* 上方吃掉篩選列一部分下緣留白，讓上下間距接近活動卡片之間的距離 */
-      margin: -8px 0 6px;
+      position: relative;
+      margin: -8px -16px 6px;
     }
 
     .interest-bar:empty {
@@ -811,8 +810,6 @@
     /* 泡泡軌道：超出寬度時由 JS 自動慢速捲動（跑馬燈），也可以手動滑。兩端淡出。 */
     /* 一排或兩排泡泡的容器，「＋」固定在右側並上下置中 */
     .interest-rows {
-      flex: 1 1 auto;
-      min-width: 0;
       display: flex;
       flex-direction: column;
       gap: 0;
@@ -824,27 +821,25 @@
       display: flex;
       gap: 8px;
       overflow-x: auto;
-      /* 上下留給泡泡陰影，太小陰影會被 overflow 切得很硬 */
-      padding: 4px 0 6px;
+      /* 上下留給泡泡陰影；左右 16px 讓靜止時與卡片對齊，右側多留給浮動的「＋」 */
+      padding: 4px 52px 6px 16px;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
     }
 
     /* 兩端淡出只在跑馬燈啟動時才有，靜止時不能切到第一顆泡泡 */
-    /* 淡出要夠長，泡泡才是慢慢隱去；12px 太短，看起來像被切掉再蓋一層霧 */
-    .interest-track.is-marquee {
-      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
-      mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
-    }
 
     .interest-track::-webkit-scrollbar {
       display: none;
     }
 
+    /* 「＋」浮在右側，不佔一整欄 */
     .interest-actions {
-      flex: 0 0 auto;
-      display: flex;
-      gap: 6px;
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
     }
 
     .interest-chip {
@@ -906,17 +901,19 @@
       padding: 2.5px 4.5px 2.5px 12.5px;
     }
 
-    .interest-chip-add {
-      width: 36px;
+    .interest-chip.interest-chip-add {
+      width: 32px;
+      min-height: 32px;
+      height: 32px;
       justify-content: center;
       padding: 0;
       border: none;
-      background: transparent;
-      color: rgba(255, 255, 255, 0.95);
-      font-size: 24px;
+      background: rgba(255, 255, 255, 0.92);
+      color: #db2777;
+      font-size: 20px;
       font-weight: 700;
       line-height: 1;
-      box-shadow: none;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
     }
 
     /* 新增標籤的小視窗：手機上也置中（鍵盤彈出時底部會被擋），不像其他 modal 那樣由下彈出。
@@ -959,13 +956,6 @@
       justify-content: center;
     }
 
-    .interest-chip-reset {
-      padding: 4px 14px;
-      border-color: #fca5a5;
-      background: #fee2e2;
-      color: #dc2626;
-      box-shadow: none;
-    }
 
     .fab-group {
       position: fixed;
@@ -1950,7 +1940,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-13T21:43:29+08:00">v261013.2143</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-14T17:04:05+08:00">v261014.1704</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -1999,6 +1989,7 @@
       </div>
 
       <button id="btn-refresh-data" class="line-btn btn-detail" type="button" style="width:100%;">重新整理</button>
+      <button id="btn-reset-interests" class="line-btn btn-delete" type="button" style="width:100%; margin-top:8px; display:none;">重置興趣人數（管理員）</button>
     </div>
 
     <!-- Event Cards Container -->
@@ -2461,7 +2452,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261013.2143", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261014.1704", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4541,15 +4532,9 @@
       addChip.onclick = createInterestTag;
       actions.append(addChip);
 
-      if (currentUserCanDeleteAnyEvent && tags.length > 0) {
-        const resetChip = document.createElement("button");
-        resetChip.type = "button";
-        resetChip.className = "interest-chip interest-chip-reset";
-        resetChip.textContent = "重置";
-        resetChip.title = "清空所有標籤的人數";
-        resetChip.onclick = adminResetInterests;
-        actions.append(resetChip);
-      }
+      // 管理員的「重置興趣人數」放在排序面板裡，泡泡列只留「＋」。
+      const resetBtn = document.getElementById("btn-reset-interests");
+      if (resetBtn) resetBtn.style.display = currentUserCanDeleteAnyEvent && tags.length > 0 ? "" : "none";
 
       bar.append(rowsEl, actions);
 
@@ -5859,6 +5844,7 @@ ${pageUrl}`;
       document.getElementById("btn-open-calendar").onclick = openCalendarModal;
 
       document.getElementById("btn-open-checkin").onclick = openCheckinModal;
+      document.getElementById("btn-reset-interests").onclick = adminResetInterests;
 
       document.getElementById("form-interest-new").addEventListener("submit", e => {
         e.preventDefault();
