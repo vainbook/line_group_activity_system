@@ -56,6 +56,12 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    /* 泡泡列用 100vw 延伸到螢幕邊緣，電腦版有捲軸時會多出幾 px，裁掉避免整頁左右晃。
+       用 clip 而不是 hidden：hidden 會讓 body 變成捲動容器。 */
+    html, body {
+      overflow-x: clip;
+    }
+
     body {
       background-color: var(--line-bg);
       color: var(--line-text-main);
@@ -800,7 +806,11 @@
        不用半透明淡出：粉色泡泡疊在藍底上淡出會變成一層灰霧，看起來很假。 */
     .interest-bar {
       position: relative;
-      margin: -8px -16px 6px;
+      /* 不管螢幕多寬都延伸到真正的螢幕邊緣；只抵銷 .container 的 16px 時，
+         寬螢幕上泡泡會在畫面中間被兩條直線切掉。 */
+      width: 100vw;
+      margin: -8px 0 6px calc(50% - 50vw);
+      --interest-inset: max(16px, calc((100vw - 600px) / 2 + 16px));
     }
 
     .interest-bar:empty {
@@ -822,7 +832,7 @@
       gap: 8px;
       overflow-x: auto;
       /* 上下留給泡泡陰影；左右 16px 讓靜止時與卡片對齊，右側多留給浮動的「＋」 */
-      padding: 4px 52px 6px 16px;
+      padding: 4px calc(var(--interest-inset) + 36px) 6px var(--interest-inset);
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
     }
@@ -833,10 +843,39 @@
       display: none;
     }
 
+    /* 跑馬燈交給 CSS 動畫（GPU 位移），不在每一幀用 JS 改 scrollLeft：
+       每幀只動 0.2px，手機會湊成整數像素才畫，看起來一頓一頓。 */
+    .interest-lane {
+      display: flex;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .interest-lane.is-running {
+      animation: interest-marquee var(--marquee-duration, 60s) linear infinite;
+      animation-delay: var(--marquee-delay, 0s);
+      will-change: transform;
+    }
+
+    .interest-rows.is-paused .interest-lane.is-running {
+      animation-play-state: paused;
+    }
+
+    @keyframes interest-marquee {
+      from { transform: translateX(0); }
+      to { transform: translateX(calc(-1 * var(--marquee-loop, 0px))); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .interest-lane.is-running {
+        animation: none;
+      }
+    }
+
     /* 「＋」浮在右側，不佔一整欄 */
     .interest-actions {
       position: absolute;
-      right: 14px;
+      right: calc(var(--interest-inset) - 2px);
       top: 50%;
       transform: translateY(-50%);
       z-index: 2;
@@ -1940,7 +1979,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-14T17:04:05+08:00">v261014.1704</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-14T17:10:11+08:00">v261014.1710</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2452,7 +2491,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261014.1704", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261014.1710", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4509,7 +4548,7 @@
     function renderInterestBar() {
       const bar = document.getElementById("interest-bar");
       if (!bar) return;
-      const previousScrolls = interestMarquee.rows.map(row => row.track.scrollLeft);
+      const previousOffsets = interestMarquee.rows.map(row => getLaneOffset(row.lane));
       bar.replaceChildren();
 
       const tags = eventsData
@@ -4542,7 +4581,10 @@
       // 泡泡大小不變；只是總長超過兩排的量時，往下多長一排，兩排各自跑馬燈。
       const measure = document.createElement("div");
       measure.className = "interest-track";
-      tags.forEach(evt => measure.append(buildInterestChip(evt, myUserId, false, 0)));
+      const measureLane = document.createElement("div");
+      measureLane.className = "interest-lane";
+      tags.forEach(evt => measureLane.append(buildInterestChip(evt, myUserId, false, 0)));
+      measure.append(measureLane);
       rowsEl.append(measure);
       const useTwoRows = tags.length >= 4 && measure.scrollWidth > measure.clientWidth * 2;
       rowsEl.replaceChildren();
@@ -4556,67 +4598,67 @@
       rowTags.forEach((list, rowIndex) => {
         const track = document.createElement("div");
         track.className = "interest-track";
+        const lane = document.createElement("div");
+        lane.className = "interest-lane";
         const colors = assignInterestColors(list);
-        list.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, false, colors[i])));
+        list.forEach((evt, i) => lane.append(buildInterestChip(evt, myUserId, false, colors[i])));
+        track.append(lane);
         rowsEl.append(track);
 
-        // 只有塞不下時才跑：補一份複本，捲到一半時無縫接回開頭。
+        // 只有塞不下時才跑：補一份複本，位移一個循環長度後剛好接回開頭。
         if (list.length === 0 || track.scrollWidth <= track.clientWidth + 1) return;
-        const firstWidth = track.scrollWidth;
-        list.forEach((evt, i) => track.append(buildInterestChip(evt, myUserId, true, colors[i])));
-        const loopWidth = (track.scrollWidth - firstWidth) || firstWidth; // 第一顆到它複本的距離
-        track.scrollLeft = (previousScrolls[rowIndex] || 0) % loopWidth;
-        track.classList.add("is-marquee");
-        interestMarquee.rows.push({ track, loopWidth, offset: track.scrollLeft });
+        const firstWidth = lane.scrollWidth;
+        list.forEach((evt, i) => lane.append(buildInterestChip(evt, myUserId, true, colors[i])));
+        const loopWidth = (lane.scrollWidth - firstWidth) || firstWidth; // 第一顆到它複本的距離
+        const duration = loopWidth / INTEREST_MARQUEE_SPEED;
+        // 重畫時接著上一次的位置跑：負的 delay 等於從動畫中途開始。
+        const previousOffset = (previousOffsets[rowIndex] || 0) % loopWidth;
+        lane.style.setProperty("--marquee-loop", `${loopWidth}px`);
+        lane.style.setProperty("--marquee-duration", `${duration}s`);
+        lane.style.setProperty("--marquee-delay", `${-(previousOffset / INTEREST_MARQUEE_SPEED)}s`);
+        lane.classList.add("is-running");
+        interestMarquee.rows.push({ lane, loopWidth });
       });
 
       if (interestMarquee.rows.length > 0) {
         // 碰任何一排兩排一起停，放開 3 秒後一起續跑。
-        const pause = () => { interestMarquee.pausedUntil = Infinity; };
-        const resumeLater = () => { interestMarquee.pausedUntil = performance.now() + 3000; };
+        if (interestMarquee.paused) rowsEl.classList.add("is-paused");
+        const pause = () => {
+          clearTimeout(interestMarquee.resumeTimer);
+          interestMarquee.paused = true;
+          rowsEl.classList.add("is-paused");
+        };
+        const resumeLater = () => {
+          clearTimeout(interestMarquee.resumeTimer);
+          interestMarquee.resumeTimer = setTimeout(() => {
+            interestMarquee.paused = false;
+            const current = document.querySelector("#interest-bar .interest-rows");
+            if (current) current.classList.remove("is-paused");
+          }, 3000);
+        };
         rowsEl.addEventListener("pointerdown", pause);
         rowsEl.addEventListener("touchstart", pause, { passive: true });
         rowsEl.addEventListener("pointerup", resumeLater);
         rowsEl.addEventListener("pointercancel", resumeLater);
         rowsEl.addEventListener("touchend", resumeLater, { passive: true });
-        rowsEl.addEventListener("wheel", resumeLater, { passive: true });
-        startInterestMarquee();
+        rowsEl.addEventListener("wheel", () => { pause(); resumeLater(); }, { passive: true });
       }
     }
 
-    // 跑馬燈狀態只有一份，renderInterestBar 每次重畫時換掉 rows，不會疊出多個動畫迴圈。
-    // offset 是浮點累加值：每幀只移動不到 1px，直接對 scrollLeft 加小數會被瀏覽器捨掉而停住。
-    const interestMarquee = { rows: [], pausedUntil: 0, running: false, lastTime: 0 };
-    const INTEREST_MARQUEE_SPEED = 12; // px／秒。22 實機看太快，12 才看得清、點得到
-
-    function startInterestMarquee() {
-      if (interestMarquee.running) return;
-      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      interestMarquee.running = true;
-      interestMarquee.lastTime = performance.now();
-      const step = now => {
-        const rows = interestMarquee.rows.filter(row => row.track.isConnected && row.loopWidth > 0);
-        if (rows.length === 0) {
-          interestMarquee.running = false;
-          return;
-        }
-        const elapsed = Math.min(now - interestMarquee.lastTime, 100);
-        interestMarquee.lastTime = now;
-        const moving = now >= interestMarquee.pausedUntil && document.visibilityState !== "hidden";
-        rows.forEach(row => {
-          if (moving) {
-            row.offset += (INTEREST_MARQUEE_SPEED * elapsed) / 1000;
-            if (row.offset >= row.loopWidth) row.offset -= row.loopWidth;
-            row.track.scrollLeft = row.offset;
-          } else {
-            // 暫停期間使用者可能手動滑過，恢復時從他停下的位置接著跑。
-            row.offset = row.track.scrollLeft % row.loopWidth;
-          }
-        });
-        requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
+    // 讀出某一排目前的位移量（px），重畫時用來接續動畫位置。
+    function getLaneOffset(lane) {
+      const transform = getComputedStyle(lane).transform;
+      if (!transform || transform === "none") return 0;
+      const values = transform.match(/matrix(?:3d)?\(([^)]+)\)/);
+      if (!values) return 0;
+      const parts = values[1].split(",").map(Number);
+      const tx = parts.length === 16 ? parts[12] : parts[4];
+      return Math.abs(tx) || 0;
     }
+
+    // 跑馬燈狀態只有一份；動畫本身由 CSS 執行，這裡只記每排的 lane 與暫停狀態。
+    const interestMarquee = { rows: [], paused: false, resumeTimer: null };
+    const INTEREST_MARQUEE_SPEED = 12; // px／秒。22 實機看太快，12 才看得清、點得到
 
     // 原生 prompt 在手機上會露出網址列文字、樣式不搭，部分 LINE 瀏覽器還會擋，改用自己的小視窗。
     function createInterestTag() {
