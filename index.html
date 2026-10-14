@@ -56,12 +56,6 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* 泡泡列用 100vw 延伸到螢幕邊緣，電腦版有捲軸時會多出幾 px，裁掉避免整頁左右晃。
-       用 clip 而不是 hidden：hidden 會讓 body 變成捲動容器。 */
-    html, body {
-      overflow-x: clip;
-    }
-
     body {
       background-color: var(--line-bg);
       color: var(--line-text-main);
@@ -804,13 +798,19 @@
     /* 興趣調查泡泡列。可左右滑，不換行；名稱太長就省略，維持泡泡大小一致。 */
     /* 泡泡列延伸到螢幕左右邊緣（抵銷 .container 的 16px），泡泡直接從螢幕邊滑進滑出。
        不用半透明淡出：粉色泡泡疊在藍底上淡出會變成一層灰霧，看起來很假。 */
+    /* 手機：抵銷 .container 的 16px，延伸到螢幕邊緣，泡泡從螢幕邊滑進滑出。
+       寬螢幕（內容不再貼邊）：跟卡片同寬，左右邊界與上下排版對齊。 */
     .interest-bar {
       position: relative;
-      /* 不管螢幕多寬都延伸到真正的螢幕邊緣；只抵銷 .container 的 16px 時，
-         寬螢幕上泡泡會在畫面中間被兩條直線切掉。 */
-      width: 100vw;
-      margin: -8px 0 6px calc(50% - 50vw);
-      --interest-inset: max(16px, calc((100vw - 600px) / 2 + 16px));
+      margin: -8px -16px 6px;
+      --interest-inset: 16px;
+    }
+
+    @media (min-width: 632px) {
+      .interest-bar {
+        margin: -8px 0 6px;
+        --interest-inset: 0px;
+      }
     }
 
     .interest-bar:empty {
@@ -875,7 +875,7 @@
     /* 「＋」浮在右側，不佔一整欄 */
     .interest-actions {
       position: absolute;
-      right: calc(var(--interest-inset) - 2px);
+      right: var(--interest-inset);
       top: 50%;
       transform: translateY(-50%);
       z-index: 2;
@@ -1979,7 +1979,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-14T17:10:11+08:00">v261014.1710</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-14T22:52:29+08:00">v261014.2252</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2491,7 +2491,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261014.1710", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261014.2252", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
