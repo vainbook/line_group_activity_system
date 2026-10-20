@@ -874,8 +874,8 @@
     }
 
     @keyframes interest-marquee {
-      from { transform: translateX(0); }
-      to { transform: translateX(calc(-1 * var(--marquee-loop, 0px))); }
+      from { transform: translateX(calc(-1 * var(--marquee-loop, 0px))); }
+      to { transform: translateX(calc(-2 * var(--marquee-loop, 0px))); }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -2000,7 +2000,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-15T21:48:28+08:00">v261015.2148</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-10-20T14:53:29+08:00">v261020.1453</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2512,7 +2512,7 @@
       "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
 
     const CONFIG = {
-      APP_VERSION: "v261015.2148", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261020.1453", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -4569,7 +4569,7 @@
     function renderInterestBar() {
       const bar = document.getElementById("interest-bar");
       if (!bar) return;
-      const previousOffsets = interestMarquee.rows.map(row => getLaneOffset(row.lane));
+      const previousOffsets = interestMarquee.rows.map(getRowOffset);
       bar.replaceChildren();
 
       const tags = eventsData
@@ -4626,11 +4626,14 @@
         track.append(lane);
         rowsEl.append(track);
 
-        // 只有塞不下時才跑：補一份複本，位移一個循環長度後剛好接回開頭。
+        // 只有塞不下時才跑。排成「複本｜本體｜複本｜複本」，動畫在第二、三份之間位移一圈後剛好接回。
+        // 前面那份是給手指往回拖的空間，後面多一份是往前拖的空間（見 pauseInterestMarquee）。
         if (list.length === 0 || track.scrollWidth <= track.clientWidth + 1) return;
         const firstWidth = lane.scrollWidth;
         list.forEach((evt, i) => lane.append(buildInterestChip(evt, myUserId, true, colors[i])));
         const loopWidth = (lane.scrollWidth - firstWidth) || firstWidth; // 第一顆到它複本的距離
+        list.forEach((evt, i) => lane.append(buildInterestChip(evt, myUserId, true, colors[i])));
+        lane.prepend(...list.map((evt, i) => buildInterestChip(evt, myUserId, true, colors[i])));
         const duration = loopWidth / INTEREST_MARQUEE_SPEED;
         // 重畫時接著上一次的位置跑：負的 delay 等於從動畫中途開始。
         const previousOffset = (previousOffsets[rowIndex] || 0) % loopWidth;
@@ -4638,32 +4641,93 @@
         lane.style.setProperty("--marquee-duration", `${duration}s`);
         lane.style.setProperty("--marquee-delay", `${-(previousOffset / INTEREST_MARQUEE_SPEED)}s`);
         lane.classList.add("is-running");
-        interestMarquee.rows.push({ lane, loopWidth });
+        interestMarquee.rows.push({ lane, track, loopWidth, manual: false });
+        // 拖曳或慣性滑動還在進行，就把續跑往後延
+        track.addEventListener("scroll", () => {
+          if (interestMarquee.paused) resumeInterestMarqueeLater();
+        }, { passive: true });
       });
 
       if (interestMarquee.rows.length > 0) {
         // 碰任何一排兩排一起停，放開 3 秒後一起續跑。
         if (interestMarquee.paused) rowsEl.classList.add("is-paused");
-        const pause = () => {
-          clearTimeout(interestMarquee.resumeTimer);
-          interestMarquee.paused = true;
-          rowsEl.classList.add("is-paused");
-        };
-        const resumeLater = () => {
-          clearTimeout(interestMarquee.resumeTimer);
-          interestMarquee.resumeTimer = setTimeout(() => {
-            interestMarquee.paused = false;
-            const current = document.querySelector("#interest-bar .interest-rows");
-            if (current) current.classList.remove("is-paused");
-          }, 3000);
-        };
-        rowsEl.addEventListener("pointerdown", pause);
-        rowsEl.addEventListener("touchstart", pause, { passive: true });
-        rowsEl.addEventListener("pointerup", resumeLater);
-        rowsEl.addEventListener("pointercancel", resumeLater);
-        rowsEl.addEventListener("touchend", resumeLater, { passive: true });
-        rowsEl.addEventListener("wheel", () => { pause(); resumeLater(); }, { passive: true });
+        rowsEl.addEventListener("pointerdown", pauseInterestMarquee);
+        rowsEl.addEventListener("touchstart", pauseInterestMarquee, { passive: true });
+        rowsEl.addEventListener("pointerup", resumeInterestMarqueeLater);
+        rowsEl.addEventListener("pointercancel", resumeInterestMarqueeLater);
+        rowsEl.addEventListener("touchend", resumeInterestMarqueeLater, { passive: true });
+        rowsEl.addEventListener("wheel", () => { pauseInterestMarquee(); resumeInterestMarqueeLater(); }, { passive: true });
+        enableMouseDragScroll(rowsEl);
       }
+    }
+
+    // 動畫用 transform 位移，原生捲動的 scrollLeft 一直是 0，手指往右拖就拖不動（前面沒有內容）。
+    // 所以一碰到就把「目前位移」換成 scrollLeft、停掉動畫，交給原生捲動；續跑時再把 scrollLeft 換回動畫起點。
+    function pauseInterestMarquee() {
+      clearTimeout(interestMarquee.resumeTimer);
+      interestMarquee.paused = true;
+      document.querySelector("#interest-bar .interest-rows")?.classList.add("is-paused");
+      interestMarquee.rows.forEach(row => {
+        if (row.manual) return;
+        // 用沒取餘數的位移：畫面上同一顆泡泡留在原地、還是同一個元素，
+        // 否則按下與放開落在不同元素上，點擊會整個消失。
+        const offset = getLaneOffset(row.lane) || row.loopWidth;
+        row.lane.classList.remove("is-running");
+        row.manual = true;
+        row.track.scrollLeft = offset;
+      });
+    }
+
+    function resumeInterestMarqueeLater() {
+      clearTimeout(interestMarquee.resumeTimer);
+      interestMarquee.resumeTimer = setTimeout(() => {
+        interestMarquee.paused = false; // 先改狀態，下面歸零 scrollLeft 觸發的 scroll 事件才不會又延後
+        document.querySelector("#interest-bar .interest-rows")?.classList.remove("is-paused");
+        interestMarquee.rows.forEach(row => {
+          if (!row.manual) return;
+          const offset = getRowOffset(row);
+          row.manual = false;
+          row.track.scrollLeft = 0;
+          row.lane.style.setProperty("--marquee-delay", `${-(offset / INTEREST_MARQUEE_SPEED)}s`);
+          row.lane.classList.add("is-running");
+        });
+      }, 3000);
+    }
+
+    // 某一排目前捲到循環裡的哪裡（0～loopWidth）：拖曳中看 scrollLeft，跑動中看動畫位移。
+    function getRowOffset(row) {
+      const raw = row.manual ? row.track.scrollLeft : getLaneOffset(row.lane);
+      return ((raw % row.loopWidth) + row.loopWidth) % row.loopWidth;
+    }
+
+    // 電腦上滑鼠不能拖原生捲動，補上按住拖曳。拖過才吃掉放開時的 click，避免拖完誤開詳情。
+    function enableMouseDragScroll(container) {
+      let drag = null;
+      container.addEventListener("pointerdown", event => {
+        if (event.pointerType !== "mouse" || event.button !== 0) return;
+        const track = event.target.closest(".interest-track");
+        if (track) drag = { track, x: event.clientX, left: track.scrollLeft, moved: false, id: event.pointerId };
+      });
+      container.addEventListener("pointermove", event => {
+        if (!drag || event.pointerId !== drag.id) return;
+        const dx = event.clientX - drag.x;
+        if (!drag.moved && Math.abs(dx) > 4) {
+          drag.moved = true;
+          container.setPointerCapture(event.pointerId);
+        }
+        if (drag.moved) drag.track.scrollLeft = drag.left - dx;
+      });
+      const end = () => {
+        if (drag?.moved) {
+          // click 緊接在 pointerup 之後；下一輪就拿掉，萬一沒有 click 也不會吃掉之後真正的點擊
+          const swallow = e => { e.stopPropagation(); e.preventDefault(); };
+          container.addEventListener("click", swallow, { capture: true, once: true });
+          setTimeout(() => container.removeEventListener("click", swallow, { capture: true }), 0);
+        }
+        drag = null;
+      };
+      container.addEventListener("pointerup", end);
+      container.addEventListener("pointercancel", () => { drag = null; });
     }
 
     // 讀出某一排目前的位移量（px），重畫時用來接續動畫位置。
