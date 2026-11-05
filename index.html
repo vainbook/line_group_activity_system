@@ -15,7 +15,7 @@
        ================================================================== -->
   <script>
     window.SITE_SETUP = {
-      GAS_API_URL: "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec",
+      GAS_API_URL: "https://line-bulletin-api.vainbook.workers.dev",
       LIFF_ID: "2010984505-Nv6CpgYO",
       LIFF_URL: "https://liff.line.me/2010984505-Nv6CpgYO",
       OWNER_HOSTS: ["vainbook.github.io"]
@@ -705,11 +705,6 @@
       color: #ea580c;
     }
 
-    #btn-open-calendar {
-      background: #f5f3ff;
-      color: #7c3aed;
-    }
-
     .sort-toggle::after {
       content: "\25BE";
       margin-left: 5px;
@@ -1277,60 +1272,6 @@
       color: var(--line-text-sub);
     }
 
-
-    /* 活動日曆檢視 */
-    .calendar-hint {
-      font-size: 12px;
-      color: #64748b;
-      margin: 0 0 10px;
-      line-height: 1.6;
-    }
-
-    .calendar-embed-wrap {
-      width: 100%;
-      height: 58vh;
-      min-height: 320px;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      overflow: hidden;
-      background: #f8fafc;
-    }
-
-    .calendar-embed-wrap iframe {
-      width: 100%;
-      height: 100%;
-      border: 0;
-      display: block;
-    }
-
-    .calendar-unavailable {
-      padding: 24px 12px;
-      text-align: center;
-      font-size: 13px;
-      color: #64748b;
-      border: 1px dashed #cbd5e1;
-      border-radius: 10px;
-    }
-
-    .calendar-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .calendar-actions .line-btn {
-      flex: 1;
-      text-align: center;
-      text-decoration: none;
-      padding: 10px;
-    }
-
-    .calendar-note {
-      font-size: 11px;
-      color: #94a3b8;
-      margin: 10px 0 0;
-      line-height: 1.7;
-    }
 
     /* Native Full Screen Sheet Modal */
     .modal-overlay {
@@ -2000,7 +1941,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-10-20T14:53:29+08:00">v261020.1453</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-11-06T02:27:22+08:00">v261106.0227</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2027,7 +1968,6 @@
               aria-expanded="false" aria-controls="sort-panel"><span>排序</span></button>
       <button id="btn-open-checkin" class="nav-action" type="button"><span>打卡</span></button>
       <button id="btn-broadcast-all" class="nav-action" type="button"><span>宣傳</span></button>
-      <button id="btn-open-calendar" class="nav-action" type="button"><span>日曆</span></button>
     </nav>
 
     <!-- 排序與篩選面板（點「排序」展開） -->
@@ -2130,39 +2070,6 @@
         <button class="line-btn btn-detail" style="flex:1;" data-close="modal-checkin">
           關閉視窗
         </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Calendar View (活動日曆) -->
-  <div id="modal-calendar" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="title-calendar">
-    <div class="modal-box">
-      <div class="modal-header">
-        <span id="title-calendar" class="modal-title-text">活動日曆</span>
-        <button class="modal-close" data-close="modal-calendar" aria-label="關閉活動日曆視窗">關閉</button>
-      </div>
-      <div class="modal-form-body">
-        <p id="calendar-hint" class="calendar-hint">
-          這裡顯示所有未過期的一般活動。興趣調查沒有日期，不會出現在日曆上。
-        </p>
-        <div id="calendar-embed-wrap" class="calendar-embed-wrap">
-          <iframe id="calendar-embed" title="活動日曆" loading="lazy"></iframe>
-        </div>
-        <div id="calendar-unavailable" class="calendar-unavailable" style="display:none;">
-          尚未設定日曆，或雲端仍在同步中。請稍後再試。
-        </div>
-        <div class="calendar-actions">
-          <a id="btn-subscribe-calendar" class="line-btn btn-join" target="_blank" rel="noopener noreferrer">
-            訂閱到我的 Google 日曆
-          </a>
-          <a id="btn-open-calendar-web" class="line-btn btn-calendar" target="_blank" rel="noopener noreferrer">
-            在瀏覽器開啟
-          </a>
-        </div>
-        <p class="calendar-note">
-          訂閱後，之後新增或修改的活動都會自動出現在你的 Google 日曆。
-          若按了訂閱卻看不到內容，代表這本日曆尚未開放給你，請找管理員設定共用權限。
-        </p>
       </div>
     </div>
   </div>
@@ -2509,10 +2416,10 @@
     const SITE_SETUP = window.SITE_SETUP || {};
     // 判斷「有沒有換過後端」的基準值。改後端時這一行要跟著 SITE_SETUP 一起換。
     const DEFAULT_OWNER_GAS_URL =
-      "https://script.google.com/macros/s/AKfycbwIMCqBv01Oyu5idmPBTv5QNYNbu2msqw8LYjmesxwRjeKaBwSp_XVUL28PDgjg6Rlzkw/exec";
+      "https://line-bulletin-api.vainbook.workers.dev";
 
     const CONFIG = {
-      APP_VERSION: "v261020.1453", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261106.0227", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -2556,6 +2463,7 @@
     // 打卡名單。刻意不進 localStorage：名單不是離線必需品，
     // 每次同步都會整份覆蓋，多一份本機快取只會多一組要維護的合併邏輯。
     let membersData = [];
+    let groupMemberCount = 0; // 機器人回報的群組總人數，0 = 還沒有機器人
     // 後端有沒有 Members 表。用 doGet 是否回傳 members 判斷，比 schemaVersion 準
     // （schemaVersion 只檢查 Events 的欄位，看不出 Members 表建了沒）。
     let membersSupported = false;
@@ -2576,7 +2484,6 @@
     let localMutationRevision = 0;
     let serverSchemaVersion = "0";
     // 日曆 ID 由 GAS 提供，不寫進前端程式碼與 GitHub。
-    let serverCalendarInfo = null;
     let automaticUpdatesStarted = false;
     let automaticUpdateDebounceTimer = null;
     let mutationSendChain = Promise.resolve();
@@ -3575,9 +3482,9 @@
         
         if (data && data.status === "success" && data.events && Array.isArray(data.events)) {
           serverSchemaVersion = String(data.schemaVersion || "1");
-          serverCalendarInfo = (data.calendar && data.calendar.configured) ? data.calendar : null;
           // 舊版 GAS 不會回傳 members，用它當能力旗標；此時不可把本機名單清空。
           membersSupported = Array.isArray(data.members);
+          groupMemberCount = Number(data.groupMemberCount) || 0;
           updateFixedGroupAvailability();
           updateCheckinAvailability();
           const uniqueEventMap = new Map();
@@ -4290,7 +4197,7 @@
       const doneCount = membersData.filter(isMemberCheckedIn).length;
       summaryEl.innerText = total === 0
         ? (membersSupported ? "名單還是空的，第一個登記的人會自動加入" : "雲端尚未取得名單")
-        : `打卡成功 ${doneCount} / 已登記 ${total} 人`;
+        : `打卡成功 ${doneCount} / 已登記 ${total}${groupMemberCount ? ` / 群組 ${groupMemberCount}` : ""} 人`;
 
       const visible = getVisibleMembers();
       listEl.replaceChildren();
@@ -5336,24 +5243,6 @@ ${pageUrl}`;
       });
     }
 
-    // --- 活動日曆檢視 ---
-    function buildCalendarEmbedUrl(calendarId) {
-      const params = new URLSearchParams({
-        src: calendarId,
-        ctz: "Asia/Taipei",
-        mode: "AGENDA",
-        showTitle: "0",
-        showPrint: "0",
-        showCalendars: "0",
-        showTz: "0"
-      });
-      return `https://calendar.google.com/calendar/embed?${params.toString()}`;
-    }
-
-    function buildCalendarSubscribeUrl(calendarId) {
-      return `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(calendarId)}`;
-    }
-
     function formatGoogleCalendarTimestamp(dateValue) {
       return dateValue.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
     }
@@ -5399,45 +5288,6 @@ ${pageUrl}`;
       }
       window.open(calendarUrl, "_blank", "noopener,noreferrer");
     }
-
-    function openCalendarModal() {
-      const embedWrap = document.getElementById("calendar-embed-wrap");
-      const unavailable = document.getElementById("calendar-unavailable");
-      const actions = document.querySelector(".calendar-actions");
-      const calendarId = serverCalendarInfo && serverCalendarInfo.calendarId;
-
-      if (!calendarId) {
-        embedWrap.style.display = "none";
-        actions.style.display = "none";
-        unavailable.style.display = "block";
-      } else {
-        embedWrap.style.display = "block";
-        actions.style.display = "flex";
-        unavailable.style.display = "none";
-
-        const iframe = document.getElementById("calendar-embed");
-        const embedUrl = buildCalendarEmbedUrl(calendarId);
-        // 每次開啟才載入，避免背景持續佔用 LINE 內建瀏覽器資源。
-        if (iframe.getAttribute("src") !== embedUrl) iframe.setAttribute("src", embedUrl);
-
-        const subscribeUrl = buildCalendarSubscribeUrl(calendarId);
-        document.getElementById("btn-subscribe-calendar").href = subscribeUrl;
-        document.getElementById("btn-open-calendar-web").href = embedUrl;
-
-        const titleEl = document.getElementById("title-calendar");
-        const name = serverCalendarInfo && serverCalendarInfo.name;
-        titleEl.innerText = name ? `活動日曆 · ${name}` : "活動日曆";
-      }
-
-      openModal("modal-calendar");
-    }
-
-    function closeCalendarModal() {
-      // 關閉時卸載 iframe，避免留在背景持續連線。
-      const iframe = document.getElementById("calendar-embed");
-      if (iframe) iframe.removeAttribute("src");
-    }
-
 
     function populateEditHostOptions(evt) {
       const select = document.getElementById("edit-host-user");
@@ -5908,7 +5758,6 @@ ${pageUrl}`;
       const modal = document.getElementById(id);
       modal.classList.remove("active");
       modal.setAttribute("aria-hidden", "true");
-      if (id === "modal-calendar") closeCalendarModal();
     }
 
     // --- 17. DEV PROFILES ---
@@ -5969,7 +5818,6 @@ ${pageUrl}`;
         openModal("modal-create");
       };
 
-      document.getElementById("btn-open-calendar").onclick = openCalendarModal;
 
       document.getElementById("btn-open-checkin").onclick = openCheckinModal;
       document.getElementById("btn-reset-interests").onclick = adminResetInterests;

@@ -1,0 +1,20 @@
+# 活動布告欄後端（取代 gas/Code.gs）。部署：npx wrangler@4 deploy
+# 秘密（npx wrangler@4 secret put ADMIN_PASSWORD）：管理員密碼，不寫在任何檔案
+name = "line-bulletin-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[observability]
+enabled = true
+
+# 台北 00:05（UTC 16:05）：許願結算＋搬走過期活動
+[triggers]
+crons = ["5 16 * * *"]
+
+[[durable_objects.bindings]]
+name = "BOARD"
+class_name = "Board"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Board"]

@@ -4,12 +4,13 @@
 
 ## 專案結構
 
-- `index.html`：單檔前端，包含 HTML、CSS 與所有瀏覽器 JavaScript（已超過 3800 行）。已接近單檔可維護的上限，新增大型功能前先評估是否要拆檔。
+- `index.html`：單檔前端，包含 HTML、CSS 與所有瀏覽器 JavaScript（已超過 5000 行）。已接近單檔可維護的上限，新增大型功能前先評估是否要拆檔。
 - `version.json`：GitHub Pages 自動更新檢查用的版本清單。
-- `gas/Code.gs`：Google Apps Script 後端，處理 Sheet 讀寫、權限、地圖短網址、Google 日曆同步、歸檔與操作紀錄。
-- `gas/README.md`：GAS 表格欄位、安裝、部署、日曆與歸檔說明。
+- `api/`：**後端正本**（2026-11-06 從 Google Apps Script 搬到 Cloudflare）。Worker `line-bulletin-api` + 一個 Durable Object `Board`（SQLite），網址 `https://line-bulletin-api.vainbook.workers.dev`。`api/src/index.js` 一個檔案就是全部後端，`api/test/api.test.mjs` 是本機測試。
+- `gas/`：**已退休**的 Apps Script 版本，只留著對照與緊急退回用，不要再改它、也不要以為改它會生效。試算表也已退休，停在搬家前最後一份，Cloudflare 不會寫回。
+- `worker/`：LINE 群組機器人草稿（尚未部署、功能待重新設計）。它的 `botEvent` 只寫在退休的 `gas/Code.gs` 裡，真的要上線時要改接 `api/`。
 
-Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`EventsArchive`（已退場活動，平常不讀取）、`AuditLog`（永久操作紀錄）、`Members`（打卡名單）。
+Durable Object 裡有四張表：`events`（目前顯示中的活動）、`archive`（已退場活動）、`audit`（永久操作紀錄）、`members`（打卡名單）。每張表都是一列一筆 JSON，欄位名稱與前端物件完全相同。
 
 ## 資料與隱私邊界
 
@@ -46,18 +47,16 @@ Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`E
 - **改用自訂網域時，要把新網域加進 `OWNER_HOSTS`**，同上。
 - 這是防意外不是防惡意：`/exec` 是匿名端點，擋不住刻意改前端的人。不要因此以為後端有保護。
 
-## 雙重部署架構
+## 部署架構
 
-本專案有兩個彼此獨立的發布目標，不可把「GitHub 已更新」視為「GAS 已更新」。
+前端與後端是兩個獨立的發布目標，不可把「GitHub 已更新」視為「後端已更新」。
 
 1. 前端：`index.html` 與 `version.json` 由 GitHub Pages 發布。
-2. 後端：`gas/Code.gs` 必須貼入綁定 Google Sheet 的 Apps Script，並將現有網頁應用程式部署編輯為「新版本」。
+2. 後端：`cd api && npx wrangler@4 deploy`（wrangler 已用 OAuth 登入使用者的 Cloudflare）。**部署前先問使用者。**
 
-若使用「新增部署」而產生新 `/exec` 網址，必須同步更新 `index.html` 的 `CONFIG.GAS_API_URL`。優先編輯原部署並選「新版本」，以保持網址不變。
+後端對外的 GET／POST 格式跟 GAS 版完全一樣（`status`、`schemaVersion: "5"`、`events`、`members`、每個 action 的回傳欄位），所以前端只換了網址。改後端回傳格式時，前端要一起改。
 
-線上 `/exec` 的當前結構應回傳最外層 `"schemaVersion":"5"`，並包含 `calendar` 欄位。個別舊活動的 `schemaVersion:1` 只代表建立於舊版，不代表整張 Sheet 仍是舊結構。
-
-判斷「部署到底更新了沒」時，注意 Sheet 選單功能（設定日曆、歸檔、診斷）跑的是**編輯器裡儲存的程式碼**，不需要部署；只有 `/exec`（LINE 網頁連的端點）用的是部署版本。兩者可能不同步，這是最常見的排查陷阱。
+祕密只放在 Cloudflare：`ADMIN_PASSWORD`（管理員密碼，使用者自己用 `npx wrangler@4 secret put ADMIN_PASSWORD` 設定）。本機測試用 `api/.dev.vars`（已在 `.gitignore`）。`IMPORT_SECRET` 只在搬家當下存在，搬完已刪除，所以 `importSnapshot` 之後一律失敗，這是刻意的。
 
 ## 版本與發布規則
 
@@ -72,15 +71,17 @@ Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`E
 - 除非使用者明確要求，不得自行 push GitHub 或部署 GAS。即使允許 push GitHub，GAS 仍需要使用者於 Apps Script 完成授權與部署。
 - 推送後要直接讀取 GitHub Pages 的 `version.json`，確認它已發布新版，不只檢查 `git push` 成功。
 
-## Google Sheet 與 GAS 規則
+## 後端規則
 
-- `setupProject()` 負責新增／修復 `Events`、`EventsArchive`、`AuditLog` 與 `Members` 表格及欄位，並註冊每日歸檔觸發器。只在 schema 改變或尚未初始化時要求使用者執行。
-- `onOpen()` 在電腦版 Google Sheet 頂部建立「活動布告欄」自訂選單，不是底部工作表分頁。手機版 Sheets 可能不顯示自訂選單。選單中結尾為底線的私有函式不會出現在編輯器的執行下拉選單，要驗證程式碼版本請直接搜尋原始碼字串。
-- `setAdminPassword()` 只保存加鹽 SHA-256 雜湊到 Script Properties，密碼不得出現在 Sheet 或程式碼。
-- 寫入操作必須保留 Script Lock 與 `mutationId` 幂等檢查，避免手機與電腦同時操作重複寫入。
-- 刪除活動必須維持 soft delete：`deleteEvent` 只設 `status = deleted` 並寫入 `deletedAt`、`deletedBy`、`deletedByUserId`，**不可在請求處理中刪除 Sheet 列**。列的移除只由每日歸檔流程執行，且必須先複製到 `EventsArchive` 才刪除，刪列時要由下往上避免列號位移。
-- `AuditLog` 與活動 `history` 必須記錄建立、編輯、報名、退出、交棒、加強推廣／取消推廣與刪除。
-- GAS 是多人同步的最終資料來源。不得讓舊前端快照覆蓋 GAS 中較新的參與名單。
+- 所有讀寫都進同一個 Durable Object（`idFromName("main")`）。它一次只處理一個請求，取代 GAS 的 Script Lock；寫入包在 `transactionSync` 裡，中途丟錯整筆還原。**不要在寫入流程裡 `await` 外部請求**，那會讓別的請求插隊進來。
+- `verifyAdminPassword` 與 `resolveMapLocation` 不碰資料，在 Worker 層直接處理，不進 Durable Object。
+- 管理員密碼只存在 Cloudflare 祕密 `ADMIN_PASSWORD`，用固定時間比對。不得出現在程式碼、前端或紀錄。
+- 寫入操作保留 `mutationId` 冪等檢查（查 `audit` 表），避免手機與電腦同時操作或重試時重複寫入。
+- 刪除活動維持 soft delete：`deleteEvent` 只設 `status = deleted`，**不可在請求處理中刪列**。移除只由每日排程執行，且必須先寫進 `archive`。
+- 每日排程是 `wrangler.toml` 的 cron（台北 00:05）：先做許願結算，再把已退場活動搬進 `archive`。
+- `audit` 與活動 `history` 必須記錄建立、編輯、報名、退出、交棒、加強推廣／取消推廣與刪除。
+- 後端是多人同步的最終資料來源。不得讓舊前端快照覆蓋後端中較新的參與名單。
+- 下文各節提到的 GAS 函式（例如 `assertEditPermission_`、`checkIn_`、`toggleHighlight_`）在 `api/src/index.js` 裡都有同名版本，只是去掉結尾底線；規則照舊適用。說「GAS 驗證」的地方，現在指的是 `api/`。
 
 ## 權限模型
 
@@ -228,19 +229,10 @@ Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`E
 - 「@ 標記」複製的是**目前篩選後可見的成員**（受搜尋、pill、排序影響），沿用活動視窗 `btn-mention-attendees` 的作法：只複製 `@名字`，用 `safeCopyText`。
 - 打卡視窗裡的三顆篩選 pill 沿用 `.tab-btn` 樣式但**單選互斥**，與主畫面那組多選開關無關。`setupEventListeners` 綁定主畫面篩選時必須用 `.nav-filters .tab-btn` 選擇器；改回全域 `.tab-btn` 會把 modal 那三顆也綁上活動篩選邏輯，主畫面篩選當場壞掉。
 
-### Google 日曆
+### 日曆
 
-- 活動詳情的「加到我的日曆」由前端產生 Google Calendar 新增行程網址，只建立在使用者自己的日曆，不呼叫 GAS、不改動群組共用日曆。
-- 個人日曆行程預設長度為 2 小時，帶入活動名稱、時間、地點、費用、主揪、說明與活動頁面連結，不帶入參與者名單。固定團沒有可解析的日期時間，不顯示這顆按鈕。
-- 日曆 ID 只存在 Script Properties 的 `GOOGLE_CALENDAR_ID`／`GOOGLE_CALENDAR_NAME`，**不得寫進 `Code.gs`、`index.html` 或 GitHub**。前端透過 `doGet` 的 `calendar` 欄位取得。
-- 同步只在「儲存活動」與「刪除活動」時觸發，報名／退出一律不碰日曆。這是刻意的，不要為了即時性把同步加回 RSVP 流程。
-- 只同步活動名稱、時間與地點。**不得寫入說明、費用、主揪或參與名單** —— 曾經有版本把成員名單寫進行程說明欄，那會讓所有看得到日曆的人取得名單。
-- `calendarEventId` 完全由 GAS 產生與保管，`saveEvent_` 一律忽略前端送來的值。否則舊分頁快照的空字串會清掉連結，下次儲存就重複建立行程並留下孤兒。
-- 取回既有行程後必須用 `isCalendarEventLive_()` 確認它還存在。`getEventById` 對**已刪除**的行程仍會回傳物件，而對已取消的行程呼叫 `setTitle`／`setTime` 不會讓它重新出現 —— 少了這道檢查，同步會回報成功但日曆完全沒有變化。
-- `setGoogleCalendar` 必須實際試寫一筆再刪除來驗證權限。唯讀訂閱的日曆一樣讀得到名稱，只檢查 `getCalendarById` 會讓設定看似成功、之後每次同步卻靜默失敗。
-- 已過期活動的行程保留為歷史，不再修改也不隨網頁刪除而移除。
-- 前端「日曆」按鈕位於篩選列最右（排序 → 打卡 → 宣傳 → 日曆），開啟嵌入式日曆與訂閱連結，關閉時要卸載 iframe。
-- 時間解析依賴 Apps Script 專案時區為 `Asia/Taipei`。設錯會讓所有行程整批偏移。
+- 群組共用的 Google 日曆（嵌入日曆、訂閱連結、儲存時同步行程）已在 2026-11-06 搬家時**依使用者決定拿掉**，不要加回。
+- 只保留活動詳情的「加到我的日曆」：前端產生 Google Calendar 新增行程網址，只建立在使用者自己的日曆，不經過後端。預設 2 小時，不帶參與者名單。興趣調查沒有日期，不顯示這顆按鈕。
 
 ## 資料量控制
 
@@ -269,11 +261,13 @@ Google Sheet 內有四張工作表：`Events`（目前顯示中的活動）、`E
 
 **畫面上有三組不同的 pill 共用 `.tab-btn` 樣式**：排序（`[data-event-sort]`，單選）、分類（`[data-filter]`，多選）、打卡視窗的狀態篩選（`[data-checkin-filter]`，單選）。綁定事件時**一律用 data 屬性選取，絕對不要用 `.tab-btn`**——用了就會把三組綁在一起，主畫面篩選當場壞掉。
 
-篩選列是四顆等寬按鈕（`.nav-action`，`flex: 1 1 0`）填滿整列：**排序／打卡／宣傳／日曆**。配色沿用專案既有的「淺色底 + 飽和文字」慣例（同 `.btn-edit`／`.btn-calendar`／`.btn-delete`）：排序石板灰、打卡藍、宣傳橘、日曆紫；排序展開時整顆反白成深石板色。四顆文字都必須是兩個字，變長會把整列擠壞——所以打卡在後端未就緒時只改 `disabled` 與 `title`，不改文字。
+篩選列是三顆等寬按鈕（`.nav-action`，`flex: 1 1 0`）填滿整列：**排序／打卡／宣傳**（原本的「日曆」隨共用日曆一起拿掉）。配色沿用專案既有的「淺色底 + 飽和文字」慣例（同 `.btn-edit`／`.btn-calendar`／`.btn-delete`）：排序石板灰、打卡藍、宣傳橘；排序展開時整顆反白成深石板色。每顆文字都必須是兩個字，變長會把整列擠壞——所以打卡在後端未就緒時只改 `disabled` 與 `title`，不改文字。
 
 **右下角浮動按鈕只留「揪團」一顆。** 曾經放到四顆，遮掉手機約四分之一的螢幕高度；次要入口一律放篩選列，不要再往 FAB 加。
 
 ## 同步、更新與快取
+
+> 2026-11-06 起後端是 Cloudflare。下面關於 Apps Script 排隊、Script Cache、`refreshPublicPayloadCacheQuietly_` 的段落是 GAS 時代的紀錄，解釋了前端為什麼是 60 秒同步一次；Cloudflare 沒有排隊問題，但同步間隔不需要因此縮短。前端的 pending queue、mutationId、回滾規則仍然有效。
 
 - 前端會定期同步 GAS 資料與檢查 `version.json`，並使用 `_ts` 與 `cache: "no-store"` 降低 LINE 內建瀏覽器快取影響。
 - **「網頁很慢」的第一嫌疑犯永遠是併發請求數，不是程式效率。** 2026-08-12 實測：對同一個部署同時送 6 個請求，每個請求的腳本內部只跑 1.2～2.1 秒（開試算表 0.33 秒、組資料 0.50 秒、快取全部命中），但 HTTP 各自等了 25～77 秒。部署設定是「以我的身分執行 + 任何人匿名存取」，所有使用者都算同一個執行身分，Apps Script 會把請求排隊。
