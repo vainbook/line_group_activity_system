@@ -1,0 +1,12 @@
+{
+  "name": "line-group-board",
+  "private": true,
+  "description": "LINE 群組活動布告欄：揪團、報名、興趣調查、打卡名單",
+  "cloudflare": {
+    "bindings": {
+      "ADMIN_PASSWORD": {
+        "description": "管理員密碼。點網頁標題旁的版本號、輸入這組密碼，就能刪除任何活動、管理打卡名單。"
+      }
+    }
+  }
+}

@@ -1,14 +1,15 @@
 # LINE 活動布告欄維護指南
 
-本資料夾是個人用的 LINE LIFF 活動布告欄，不屬於 UC Training 品牌網站。其他 AI 在修改前必須先讀完本檔與 `gas/README.md`，只處理本專案所需檔案。
+本資料夾是個人用的 LINE LIFF 活動布告欄，不屬於 UC Training 品牌網站。其他 AI 在修改前必須先讀完本檔，只處理本專案所需檔案。
 
 ## 專案結構
 
 - `index.html`：單檔前端，包含 HTML、CSS 與所有瀏覽器 JavaScript（已超過 5000 行）。已接近單檔可維護的上限，新增大型功能前先評估是否要拆檔。
 - `version.json`：GitHub Pages 自動更新檢查用的版本清單。
 - `api/`：**後端正本**（2026-11-06 從 Google Apps Script 搬到 Cloudflare）。Worker `line-bulletin-api` + 一個 Durable Object `Board`（SQLite），網址 `https://line-bulletin-api.vainbook.workers.dev`。`api/src/index.js` 一個檔案就是全部後端，`api/test/api.test.mjs` 是本機測試。
-- `gas/`：**已退休**的 Apps Script 版本，只留著對照與緊急退回用，不要再改它、也不要以為改它會生效。試算表也已退休，停在搬家前最後一份，Cloudflare 不會寫回。
-- `worker/`：LINE 群組機器人草稿（尚未部署、功能待重新設計）。它的 `botEvent` 只寫在退休的 `gas/Code.gs` 裡，真的要上線時要改接 `api/`。
+- `template/`＋`scripts/build-template.mjs`：給學員的乾淨範本。`node scripts/build-template.mjs` 把這個專案的 `index.html` 與 `api/src/index.js` 加上 `template/` 裡的範本專用檔，組成旁邊的 `../line_group_board_template/`（獨立 repo `vainbook/line-group-board`）。範本裡網站與後端是同一個 Worker，網頁讀 `/config.js` 取得後端網址與 LIFF ID。**改了前端或後端，要重跑腳本再推範本 repo，學員才拿得到。**腳本最後會掃描殘留的原作者網址與 LIFF ID，找到就失敗，不要把這道檢查拿掉。
+- Apps Script 後端與 SETUP.md 已在 2026-11-16 從 repo 刪除（舊版本在 git 歷史 aaaec28 以前）。試算表也已退休，停在搬家前最後一份。
+- `worker/`（未提交）：LINE 群組機器人草稿，功能待重新設計。原本寫在 GAS 的 `botEvent` 留在 `worker/gas-botEvent-reference.patch` 當參考，真要上線要改寫進 `api/src/index.js`。
 
 Durable Object 裡有四張表：`events`（目前顯示中的活動）、`archive`（已退場活動）、`audit`（永久操作紀錄）、`members`（打卡名單）。每張表都是一列一筆 JSON，欄位名稱與前端物件完全相同。
 
@@ -75,6 +76,7 @@ Durable Object 裡有四張表：`events`（目前顯示中的活動）、`archi
 
 - 所有讀寫都進同一個 Durable Object（`idFromName("main")`）。它一次只處理一個請求，取代 GAS 的 Script Lock；寫入包在 `transactionSync` 裡，中途丟錯整筆還原。**不要在寫入流程裡 `await` 外部請求**，那會讓別的請求插隊進來。
 - `verifyAdminPassword` 與 `resolveMapLocation` 不碰資料，在 Worker 層直接處理，不進 Durable Object。
+- `/config.js` 只給學員範本用：回傳 `window.SITE_SETUP`（同網域的 `/api`、Cloudflare 變數 `LIFF_ID`、缺設定時的 `SETUP_MISSING`）。你自己的網站不載入它，用 `index.html` 最上方寫死的 `SITE_SETUP`。前端看到 `SETUP_MISSING` 會整頁換成學員的設定指引。
 - 管理員密碼只存在 Cloudflare 祕密 `ADMIN_PASSWORD`，用固定時間比對。不得出現在程式碼、前端或紀錄。
 - 寫入操作保留 `mutationId` 冪等檢查（查 `audit` 表），避免手機與電腦同時操作或重試時重複寫入。
 - 刪除活動維持 soft delete：`deleteEvent` 只設 `status = deleted`，**不可在請求處理中刪列**。移除只由每日排程執行，且必須先寫進 `archive`。
@@ -297,13 +299,13 @@ Durable Object 裡有四張表：`events`（目前顯示中的活動）、`archi
 修改前：
 
 1. 檢查 `git status --short`，既有未提交修改一律視為他人工作，不得還原或覆蓋。
-2. 讀取相關功能的前端、GAS 與 `gas/README.md`，確認是否需要雙邊修改。
+2. 讀取相關功能的前端與 `api/src/index.js`，確認是否需要雙邊修改。
 3. 保留現有 UI 文字原則：不加 emoji，不復活群組重要公告功能。
 
 修改後至少完成：
 
 1. 擷取 `index.html` 內嵌 script 並以 JavaScript parser／`new Function` 檢查語法。
-2. 以 JavaScript parser／`new Function` 檢查 `gas/Code.gs` 語法。
+2. 跑後端測試：`cd api && npx wrangler@4 dev --port 8799 --test-scheduled`，另開終端機 `node api/test/api.test.mjs`。動到前端或後端時，再跑 `node scripts/build-template.mjs` 確認範本產得出來。
 3. **掃描是否呼叫了未定義的函式**：比對所有 `name(` 呼叫與已定義的 `function name`／`const name =`。語法檢查抓不到這種錯，但它會在執行時中斷整個函式 —— 曾經有一次 `openEventDetailModal()` 根本不存在，導致管理員移除成員的請求從未送出，畫面卻顯示成功。
 4. 執行 `git diff --check`。
 5. 檢查三處前端版本一致。

@@ -1,0 +1,25 @@
+# LINE 群組活動布告欄：網站（public/）與後端（src/）是同一個 Cloudflare Worker。
+name = "line-group-board"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+# LIFF_ID 部署後才在 Cloudflare 後台新增；keep_vars 讓之後重新部署不會把它清掉
+keep_vars = true
+
+[assets]
+directory = "./public"
+
+
+# 每天台北 00:05（UTC 16:05）：許願結算、整理過期活動
+[triggers]
+crons = ["5 16 * * *"]
+
+[[durable_objects.bindings]]
+name = "BOARD"
+class_name = "Board"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Board"]
+
+[observability]
+enabled = true

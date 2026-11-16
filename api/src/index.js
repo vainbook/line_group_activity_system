@@ -27,6 +27,19 @@ export default {
       return new Response(null, { headers: { ...CORS, "Access-Control-Allow-Methods": "GET, POST", "Access-Control-Allow-Headers": "Content-Type" } });
     }
     try {
+      // 學員範本：網站與後端是同一個 Worker，網頁用這支取得自己的設定，不必改任何程式。
+      // LIFF_ID 是 Cloudflare 後台的變數；還沒填時網頁會顯示設定指引。
+      if (new URL(request.url).pathname === "/config.js") {
+        const liffId = String(env.LIFF_ID || "").trim();
+        const setup = {
+          GAS_API_URL: new URL("/api", request.url).toString(),
+          LIFF_ID: liffId,
+          LIFF_URL: liffId ? "https://liff.line.me/" + liffId : "",
+          SETUP_MISSING: !liffId || !env.ADMIN_PASSWORD
+        };
+        return new Response("window.SITE_SETUP = " + JSON.stringify(setup) + ";",
+          { headers: { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" } });
+      }
       if (request.method === "GET") return board(env).fetch("https://board/read");
       if (request.method !== "POST") return errorOutput(new Error("不支援的請求"));
 

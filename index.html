@@ -1941,7 +1941,7 @@
       <div class="header-top">
         <h1 class="brand-title">
           <span>群組活動布告欄</span>
-          <time id="app-version-badge" class="version-label" datetime="2026-11-06T02:27:22+08:00">v261106.0227</time>
+          <time id="app-version-badge" class="version-label" datetime="2026-11-16T13:19:42+08:00">v261116.1319</time>
         </h1>
         <span id="login-badge" class="sync-status-badge">同步中...</span>
       </div>
@@ -2419,7 +2419,7 @@
       "https://line-bulletin-api.vainbook.workers.dev";
 
     const CONFIG = {
-      APP_VERSION: "v261106.0227", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
+      APP_VERSION: "v261116.1319", // 格式: vYYMMDD.HHMM (根據當下時間戳記更新)
       LIFF_ID: SITE_SETUP.LIFF_ID || "",
       LIFF_URL: SITE_SETUP.LIFF_URL || "",
       GAS_API_URL: SITE_SETUP.GAS_API_URL || "",
@@ -2873,6 +2873,8 @@
      */
     function needsSiteSetup() {
       if (isDevMode) return false;
+      // 學員範本：設定來自 Worker 的 /config.js，缺 LIFF_ID 或管理員密碼就先顯示設定指引。
+      if (SITE_SETUP.SETUP_MISSING) return true;
       const ownerHosts = Array.isArray(SITE_SETUP.OWNER_HOSTS) ? SITE_SETUP.OWNER_HOSTS : [];
       if (ownerHosts.includes(location.hostname)) return false;
       if (!CONFIG.GAS_API_URL) return true;
@@ -2882,6 +2884,22 @@
     function showSiteSetupNotice() {
       const box = document.createElement("div");
       box.className = "site-setup-notice";
+      if (SITE_SETUP.SETUP_MISSING) {
+        box.innerHTML = `
+          <div class="site-setup-card">
+            <h1>網站已經部署好，還差最後一步</h1>
+            <p>到 LINE Developers 建立 LIFF 時，<strong>Endpoint URL</strong> 請填：</p>
+            <p class="site-setup-steps"><code>${escapeHtml(location.origin)}</code></p>
+            <p>
+              建好後到 Cloudflare 後台這個 Worker 的「設定 → 變數和密碼」，
+              新增一個變數 <code>LIFF_ID</code>，值填 LIFF ID，
+              並確認 <code>ADMIN_PASSWORD</code> 已經設定。存檔後重新整理這頁就能用了。
+            </p>
+            <p class="site-setup-foot">完整步驟見專案的 README。</p>
+          </div>`;
+        document.body.replaceChildren(box);
+        return;
+      }
       box.innerHTML = `
         <div class="site-setup-card">
           <h1>這個網頁還沒設定完成</h1>

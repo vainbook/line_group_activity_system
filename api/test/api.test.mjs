@@ -104,7 +104,7 @@ await step("興趣標籤：發起人可自己取消；管理員重置", async ()
 await step("每日排程：許願結算、過期搬走", async () => {
   ok(await post({ action: "saveEvent", mutationId: mid(), id: "w1", actorUserId: "A", hostUser: user("A"), title: "許願", isWish: true, datetime: taipei(9 * 86400e3), createdAt: iso(-4 * 86400e3) }));
   ok(await post({ action: "saveEvent", mutationId: mid(), id: "old2", actorUserId: "A", hostUser: user("A"), title: "很久以前", datetime: taipei(-3 * 86400e3) }));
-  const res = await fetch(BASE + "/__scheduled?cron=5+16+*+*+*");
+  const res = await fetch(new URL("/__scheduled?cron=5+16+*+*+*", BASE));
   assert.equal(res.status, 200);
   const ids = (await get()).events.map(e => e.id);
   assert.equal(ids.includes("w1"), false, "人數不夠的許願要刪掉");
